@@ -1,0 +1,44 @@
+---
+import { CDPlayerInterface } from "../components/CDPlayerInterface";
+import { validateTracks } from "../utils/tracks";
+import type { Track } from "../types/track";
+import type { Playlist } from "../types/track";
+import "../styles/global.css";
+import playlistsData from "../config/playlists.json";
+
+const playlists: Playlist[] = playlistsData.playlists || [];
+const allTracks: Track[] = playlists.flatMap((playlist) => playlist.tracks);
+const tracks = validateTracks(allTracks);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/gif" href="/favicon.gif" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    <title>G*BOY WAS HERE</title>
+    <meta name="description" content="A fun interactive CD player project showcasing the sounds of Neuko, featuring a retro Walkman interface inspired by the original site's cool CRT UI." />
+    <meta property="og:title" content="G*BOY WAS HERE" />
+    <meta property="og:description" content="A fun interactive CD player project showcasing the sounds of Neuko, featuring a retro Walkman interface inspired by the original site's cool CRT UI." />
+    <meta property="og:image" content="/neuko-logo.png" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="G*BOY WAS HERE" />
+    <meta name="twitter:description" content="A fun interactive CD player project showcasing the sounds of Neuko, featuring a retro Walkman interface inspired by the original site's cool CRT UI." />
+    <meta name="twitter:image" content="/neuko-logo.png" />
+    <link rel="stylesheet" href="https://use.typekit.net/tnn5ltb.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <img src="/neuko-logo.png" alt="Neuko" class="neuko-logo" />
+    <main>
+      <CDPlayerInterface client:load tracks={tracks} />
+    </main>
+  </body>
+</html>

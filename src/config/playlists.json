@@ -1,0 +1,68 @@
+{
+  "playlists": [
+    {
+      "name": "metalcore",
+      "path": "/music/metalcore",
+      "index": 1,
+      "total": 3,
+      "tracks": [
+        {
+          "trackNumber": 1,
+          "trackName": "d1H2uKFea5J2vvDR",
+          "fileName": "/music/metalcore/d1H2uKFea5J2vvDR.mp3",
+          "duration": "0:00",
+          "playlistName": "metalcore",
+          "playlistIndex": 1,
+          "playlistTotal": 3,
+          "playlistPath": "/music/metalcore"
+        }
+      ]
+    },
+    {
+      "name": "podcast",
+      "path": "/music/podcast",
+      "index": 2,
+      "total": 3,
+      "tracks": [
+        {
+          "trackNumber": 1,
+          "trackName": "claydudes",
+          "fileName": "/music/podcast/claydudes.mp3",
+          "duration": "0:00",
+          "playlistName": "podcast",
+          "playlistIndex": 2,
+          "playlistTotal": 3,
+          "playlistPath": "/music/podcast"
+        }
+      ]
+    },
+    {
+      "name": "ringtonez",
+      "path": "/music/ringtonez",
+      "index": 3,
+      "total": 3,
+      "tracks": [
+        {
+          "trackNumber": 1,
+          "trackName": "G_THEME_RINGTONE_2_BYKAPZ",
+          "fileName": "/music/ringtonez/G_THEME_RINGTONE_2_BYKAPZ.mp3",
+          "duration": "0:00",
+          "playlistName": "ringtonez",
+          "playlistIndex": 3,
+          "playlistTotal": 3,
+          "playlistPath": "/music/ringtonez"
+        },
+        {
+          "trackNumber": 2,
+          "trackName": "G_THEME_RINGTONE_BYKAPZ",
+          "fileName": "/music/ringtonez/G_THEME_RINGTONE_BYKAPZ.mp3",
+          "duration": "0:00",
+          "playlistName": "ringtonez",
+          "playlistIndex": 3,
+          "playlistTotal": 3,
+          "playlistPath": "/music/ringtonez"
+        }
+      ]
+    }
+  ]
+}

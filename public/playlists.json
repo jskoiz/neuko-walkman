@@ -1,0 +1,23 @@
+{
+  "playlists": [
+    {
+      "name": "Default",
+      "path": "/music",
+      "index": 1,
+      "total": 1,
+      "tracks": [
+        {
+          "trackNumber": 1,
+          "trackName": "Sample Track 1",
+          "fileName": "/music/sample-1.mp3",
+          "duration": "0:00",
+          "playlistName": "Default",
+          "playlistIndex": 1,
+          "playlistTotal": 1,
+          "playlistPath": "/music"
+        }
+      ]
+    }
+  ]
+}
+

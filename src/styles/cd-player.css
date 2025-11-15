@@ -1,0 +1,384 @@
+:root {
+  --debug-mode: 1;
+}
+
+.cd-player-container {
+  min-height: 100vh;
+  background-color: #efefef;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  position: relative;
+}
+
+.cd-player-wrapper {
+  position: relative;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  padding-top: 20px;
+  z-index: 10;
+  display: inline-block;
+}
+
+.walkman-image {
+  max-width: 100%;
+  width: 100%;
+  height: auto;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+  object-fit: contain;
+}
+
+.display-overlay {
+  position: absolute;
+  top: 39%;
+  left: 13%;
+  width: 25.6%;
+  height: 8.8%;
+  background: transparent;
+  border-radius: 2px;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: none;
+  border: calc(2px * var(--debug-mode)) solid red;
+}
+
+.display-screen {
+  color: #2d364c;
+  font-family: "overtime-lcd-pro", sans-serif;
+  font-weight: 300;
+  font-style: normal;
+  font-size: clamp(1rem, 0.8vw, 0.6rem);
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  text-shadow: none;
+}
+
+.display-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 1.2em;
+}
+
+.track-number {
+  font-weight: 700;
+  font-size: 1.15em;
+  letter-spacing: 0.5px;
+}
+
+.track-time {
+  font-size: 0.95em;
+  margin-left: auto;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+}
+
+.track-filename {
+  font-weight: 700;
+  font-size: 1.05em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  color: #2d364c;
+}
+
+.playlist-info {
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 0.7em;
+  color: #2d364c;
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-number {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.playlist-name {
+  font-weight: 300;
+  letter-spacing: 0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-name {
+  font-weight: 700;
+  font-size: 1.05em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.filename {
+  font-size: 0.8em;
+  color: #2d364c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.9;
+  font-weight: 300;
+  font-style: italic;
+}
+
+.duration {
+  font-size: 0.75em;
+  color: #2d364c;
+  opacity: 0.8;
+  font-weight: 300;
+  font-style: normal;
+}
+
+.controls-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.control-button {
+  position: absolute;
+  cursor: pointer;
+  pointer-events: all;
+  border-radius: 50%;
+  transition: transform 0.1s ease;
+  z-index: 10;
+  border: calc(1px * var(--debug-mode)) solid red;
+  outline: calc(0.01px * var(--debug-mode)) solid red;
+  opacity: calc(0.8 * var(--debug-mode));
+  background: rgba(255, 0, 0, calc(0.1 * var(--debug-mode)));
+  box-shadow: 0 0 0 calc(1px * var(--debug-mode)) red;
+}
+
+.control-button:hover {
+  transform: scale(1);
+}
+
+.control-button:active,
+.control-button.pressed {
+  transform: scale(0.98);
+}
+
+.control-button.playing {
+  animation: none;
+}
+
+.control-button.play-pause {
+  top: 39%;
+  right: 23.8%;
+  width: 8%;
+  height: 8%;
+  min-width: 45px;
+  min-height: 45px;
+  max-width: 65px;
+  max-height: 65px;
+}
+
+.control-button.previous {
+  top: 40%;
+  right: 31.5%;
+  width: 7%;
+  height: 7%;
+  min-width: 32px;
+  min-height: 32px;
+  max-width: 48px;
+  max-height: 48px;
+}
+
+.control-button.next {
+  top: 40%;
+  right: 19%;
+  width: 7%;
+  height: 7%;
+  min-width: 32px;
+  min-height: 32px;
+  max-width: 48px;
+  max-height: 48px;
+}
+
+.control-button.stop {
+  top: 41.5%;
+  right: 42.5%;
+  width: 6.5%;
+  height: 6.5%;
+  min-width: 30px;
+  min-height: 30px;
+  max-width: 42px;
+  max-height: 42px;
+}
+
+.control-button.website {
+  position: absolute;
+  top: 51%;
+  right: 80%;
+  width: 15%;
+  height: 25.25px;
+  min-width: 33px;
+  min-height: 25.25px;
+  max-width: 50px;
+  max-height: 37.24px;
+  border-radius: 3px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.playlist-control {
+  position: absolute;
+  top: 51%;
+  right: 63%;
+  width: 15%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: all;
+  z-index: 10;
+}
+
+.control-button.playlist-previous {
+  position: relative;
+  top: auto;
+  right: auto;
+  left: 0;
+  width: 47.52%;
+  height: 25.25px;
+  min-width: 33px;
+  min-height: 25.25px;
+  max-width: 50px;
+  max-height: 37.24px;
+  border-radius: 3px;
+  flex: 1;
+}
+
+.control-button.playlist-next {
+  position: relative;
+  top: auto;
+  right: auto;
+  left: auto;
+  width: 47.52%;
+  height: 25.25px;
+  min-width: 33px;
+  min-height: 25.25px;
+  max-width: 50px;
+  max-height: 37.24px;
+  border-radius: 3px;
+  flex: 1;
+}
+
+.volume-control {
+  position: absolute;
+  top: 51%;
+  right: 41%;
+  width: 18%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: all;
+  z-index: 10;
+}
+
+.control-button.volume-down {
+  position: relative;
+  top: auto;
+  right: auto;
+  left: 0;
+  width: 48%;
+  height: 32px;
+  min-width: 38px;
+  min-height: 28px;
+  max-width: 55px;
+  max-height: 38px;
+  border-radius: 3px;
+  flex: 1;
+}
+
+.control-button.volume-up {
+  position: relative;
+  top: auto;
+  right: auto;
+  left: auto;
+  width: 48%;
+  height: 32px;
+  min-width: 38px;
+  min-height: 28px;
+  max-width: 55px;
+  max-height: 38px;
+  border-radius: 3px;
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .cd-player-container {
+    padding: 1rem;
+  }
+
+  .cd-player-wrapper {
+    max-width: 100%;
+    width: 100%;
+    display: inline-block;
+  }
+
+  .display-overlay {
+    top: 39%;
+    left: 13%;
+    width: 25.6%;
+    height: 8.8%;
+    padding: 3px 5px;
+  }
+
+  .display-screen {
+    font-size: clamp(0.35rem, 1vw, 0.55rem);
+  }
+
+  .control-button.play-pause {
+    min-width: 35px;
+    min-height: 35px;
+  }
+
+  .control-button.previous,
+  .control-button.next {
+    min-width: 25px;
+    min-height: 25px;
+  }
+
+  .control-button.stop {
+    min-width: 20px;
+    min-height: 20px;
+  }
+
+  .control-button.website,
+  .control-button.playlist-previous,
+  .control-button.playlist-next,
+  .control-button.volume-down,
+  .control-button.volume-up {
+    min-width: 25px;
+    min-height: 20px;
+  }
+}
