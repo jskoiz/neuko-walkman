@@ -96,9 +96,9 @@ export function useAudioPlayer(tracks: Track[]) {
       );
       if (playlistTracks.length === 0) return;
       const nextIndex = (currentIndex + 1) % playlistTracks.length;
+      wasPlayingRef.current = true;
       setCurrentTrackIndex(nextIndex);
       setCurrentTime(0);
-      wasPlayingRef.current = true;
     };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
@@ -152,7 +152,11 @@ export function useAudioPlayer(tracks: Track[]) {
         const handleCanPlay = () => {
           audio.removeEventListener('canplay', handleCanPlay);
           audio.removeEventListener('error', handleError);
-          audio.play().catch((error) => {
+          audio.play().then(() => {
+            setIsPlaying(true);
+            setIsPaused(false);
+            wasPlayingRef.current = false;
+          }).catch((error) => {
             console.error('Error auto-playing audio:', error);
             wasPlayingRef.current = false;
             setIsPlaying(false);
@@ -162,7 +166,11 @@ export function useAudioPlayer(tracks: Track[]) {
         
         if (audio.readyState >= 2) {
           audio.removeEventListener('error', handleError);
-          audio.play().catch((error) => {
+          audio.play().then(() => {
+            setIsPlaying(true);
+            setIsPaused(false);
+            wasPlayingRef.current = false;
+          }).catch((error) => {
             console.error('Error auto-playing audio:', error);
             wasPlayingRef.current = false;
             setIsPlaying(false);
@@ -171,10 +179,6 @@ export function useAudioPlayer(tracks: Track[]) {
         } else {
           audio.addEventListener('canplay', handleCanPlay);
         }
-        
-        wasPlayingRef.current = false;
-        setIsPlaying(true);
-        setIsPaused(false);
       } else {
         setTimeout(() => {
           audio.removeEventListener('error', handleError);
