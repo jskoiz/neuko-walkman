@@ -166,7 +166,7 @@
   cursor: pointer;
   pointer-events: all;
   border-radius: 50%;
-  transition: transform 0.1s ease;
+  transition: transform 0.1s ease, background 0.2s ease;
   z-index: 10;
   border: calc(1px * var(--debug-mode)) solid red;
   outline: calc(0.01px * var(--debug-mode)) solid red;
@@ -177,7 +177,7 @@
 
 .control-button:hover {
   transform: scale(1);
-  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.05) 50%, transparent 100%);
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.15) 40%, rgba(0, 0, 0, 0.05) 70%, transparent 100%);
 }
 
 .control-button:active,
