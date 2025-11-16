@@ -58,6 +58,17 @@ export function useAudioPlayer(tracks: Track[]) {
   const currentTrack = currentPlaylistTracks[currentTrackIndex] || currentPlaylistTracks[0];
   
   useEffect(() => {
+    if (currentPlaylistName === 'NEUKO' && currentPlaylistTracks.length > 0) {
+      const anthemIndex = currentPlaylistTracks.findIndex(t => 
+        t.fileName && (t.fileName.includes('anthem.mp3') || t.fileName.includes('anthem') || t.fileName.includes('/anthem'))
+      );
+      if (anthemIndex !== -1 && currentTrackIndex !== anthemIndex) {
+        setCurrentTrackIndex(anthemIndex);
+      }
+    }
+  }, [currentPlaylistName, currentPlaylistTracks]);
+
+  useEffect(() => {
     if (currentPlaylistTracks.length > 0 && currentTrackIndex >= currentPlaylistTracks.length) {
       setCurrentTrackIndex(0);
     }
