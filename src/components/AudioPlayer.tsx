@@ -31,9 +31,9 @@ export function useAudioPlayer(tracks: Track[]) {
   
   useEffect(() => {
     if (tracks.length > 0 && !currentPlaylistName) {
-      const ringtonezPlaylist = tracks.find(t => t.playlistName === 'ringtonez');
-      if (ringtonezPlaylist?.playlistName) {
-        setCurrentPlaylistName('ringtonez');
+      const neukoPlaylist = tracks.find(t => t.playlistName === 'NEUKO');
+      if (neukoPlaylist?.playlistName) {
+        setCurrentPlaylistName('NEUKO');
       } else {
         const firstTrack = tracks[0];
         if (firstTrack?.playlistName) {
