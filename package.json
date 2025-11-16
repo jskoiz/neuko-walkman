@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "scripts": {
     "generate-playlists": "node scripts/generate-playlists.js",
-    "dev": "npm run generate-playlists && astro dev",
+    "dev": "lsof -ti:4321 | xargs kill -9 2>/dev/null || true && npm run generate-playlists && astro dev",
     "build": "npm run generate-playlists && astro build",
     "preview": "astro preview",
     "astro": "astro"
