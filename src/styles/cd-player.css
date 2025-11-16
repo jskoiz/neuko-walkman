@@ -34,8 +34,8 @@
 
 .display-overlay {
   position: absolute;
-  top: 39%;
-  left: 13%;
+  top: 40%;
+  left: 14%;
   width: 25.6%;
   height: 8.8%;
   background: transparent;
@@ -102,10 +102,13 @@
   color: #2d364c;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.3em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-left: 0;
+  margin-left: -10%;
 }
 
 .playlist-number {

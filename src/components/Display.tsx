@@ -46,8 +46,7 @@ export function Display({
       <div className="display-line track-filename">{fileNameUpper}</div>
       
       <div className="display-line playlist-info">
-        <span className="playlist-number">[{currentPlaylistIndex.toString().padStart(2, '0')}/{currentPlaylistTotal.toString().padStart(2, '0')}]</span>
-        <span className="playlist-name">{currentPlaylistName.toUpperCase()}</span>
+        <span className="playlist-name">PLAYLIST:[{currentPlaylistName.toUpperCase()}]</span>
       </div>
     </div>
   );
