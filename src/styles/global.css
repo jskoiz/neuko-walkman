@@ -87,25 +87,20 @@ body {
   left: 50%;
   transform: translateX(-50%);
   font-size: 0.75rem;
-  color: #999;
+  color: #bbb;
   font-weight: 300;
   z-index: 10;
   text-align: center;
 }
 
 .page-footer a {
-  color: #999;
+  color: #bbb;
   text-decoration: none;
   transition: opacity 0.2s ease;
 }
 
 .page-footer a:hover {
   opacity: 0.7;
-}
-
-.footer-separator {
-  margin: 0 0.5em;
-  color: #999;
 }
 
 @media (max-width: 768px) {
