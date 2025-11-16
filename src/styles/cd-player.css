@@ -108,7 +108,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   padding-left: 0;
-  margin-left: -10%;
+  margin-left: 0%;
 }
 
 .playlist-number {
