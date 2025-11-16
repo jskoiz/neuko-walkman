@@ -177,6 +177,7 @@
 
 .control-button:hover {
   transform: scale(1);
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.05) 50%, transparent 100%);
 }
 
 .control-button:active,
