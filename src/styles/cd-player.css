@@ -359,7 +359,7 @@
   }
 
   .display-screen {
-    font-size: clamp(0.6rem, 2vw, 0.9rem);
+    font-size: clamp(0.5rem, 2vw, 0.75rem);
   }
 
   .control-button.play-pause {
