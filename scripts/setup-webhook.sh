@@ -1,18 +1,37 @@
 #!/bin/bash
 
-# Script to set up Telegram webhook for Vercel deployment
-# Usage: ./scripts/setup-webhook.sh <your-vercel-url> [webhook-secret]
+# Script to set up Telegram webhook for Vercel PRODUCTION deployment only
+# Usage: ./scripts/setup-webhook.sh <your-production-vercel-url> [webhook-secret]
+# 
+# ⚠️  IMPORTANT: Only use this for PRODUCTION deployments!
+# For dev branch, use: npm run bot:local (runs bot locally with polling)
 
 set -e
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <vercel-url> [webhook-secret]"
+  echo "Usage: $0 <production-vercel-url> [webhook-secret]"
   echo "Example: $0 https://your-app.vercel.app your-secret-token"
+  echo ""
+  echo "⚠️  WARNING: Only use this for PRODUCTION deployments!"
+  echo "For dev branch, run the bot locally: npm run bot:local"
   exit 1
 fi
 
 VERCEL_URL="$1"
 WEBHOOK_SECRET="${2:-}"
+
+# Warn if URL looks like a preview/dev deployment
+if [[ "$VERCEL_URL" == *"git-dev"* ]] || [[ "$VERCEL_URL" == *"preview"* ]] || [[ "$VERCEL_URL" == *"-dev-"* ]]; then
+  echo "⚠️  WARNING: This looks like a dev/preview URL!"
+  echo "Webhooks are disabled for dev/preview deployments."
+  echo "Use 'npm run bot:local' to run the bot locally for dev branch."
+  echo ""
+  read -p "Continue anyway? (y/N) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+  fi
+fi
 
 # Load environment variables from .env if it exists
 if [ -f .env ]; then

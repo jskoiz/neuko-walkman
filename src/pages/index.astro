@@ -1,4 +1,7 @@
 ---
+// This page uses SSR to load playlists dynamically
+export const prerender = false;
+
 import { CDPlayerInterface } from "../components/CDPlayerInterface";
 import { validateTracks } from "../utils/tracks";
 import type { Track } from "../types/track";
@@ -7,7 +10,25 @@ import "../styles/global.css";
 import playlistsData from "../config/playlists.json";
 import Analytics from "@vercel/analytics/astro";
 
-const playlists: Playlist[] = playlistsData.playlists || [];
+// Try to load playlists dynamically from API, fallback to static file
+let playlists: Playlist[] = playlistsData.playlists || [];
+
+// In SSR mode, fetch from dynamic API endpoint
+try {
+  // Use Astro.url to get the current request URL
+  const baseUrl = Astro.url.origin;
+  const apiUrl = `${baseUrl}/api/playlists.json`;
+  const response = await fetch(apiUrl);
+  if (response.ok) {
+    const data = await response.json();
+    if (data.playlists && data.playlists.length > 0) {
+      playlists = data.playlists;
+    }
+  }
+} catch (error) {
+  console.log('Failed to load dynamic playlists, using static file:', error);
+}
+
 const allTracks: Track[] = playlists.flatMap((playlist) => playlist.tracks);
 const tracks = validateTracks(allTracks);
 ---

@@ -151,7 +151,7 @@ async function handleStartCommand(
   const welcomeText = `Greetings Operative ${displayName}\n\n` +
     `Share your favorite songs with the community.\n\n` +
     `Click the button below to add a song:\n\n` +
-    `You can listen to all the Neuko sounds at <a href="https://bloc.rocks">https://bloc.rocks</a>`;
+    `You can listen to all the Neuko sounds <a href="https://bloc.rocks">here</a>`;
 
   // Photo URL - can be set via env var or defaults to bloc.rocks
   // Image is available at /vending-machines.jpg
@@ -292,6 +292,26 @@ export const GET: APIRoute = async () => {
  */
 export const POST: APIRoute = async ({ request }) => {
   try {
+    // Reject webhook requests on dev/preview deployments
+    // Only allow production deployments to handle webhooks
+    const vercelEnv = import.meta.env.VERCEL_ENV;
+    const isProduction = vercelEnv === 'production';
+    
+    if (!isProduction && vercelEnv) {
+      // This is a preview/dev deployment - reject webhook
+      console.log(`Webhook rejected: Environment is "${vercelEnv}", not production. Use local bot for dev branch.`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Webhook disabled for non-production deployments',
+          message: 'Use npm run bot:local for local development'
+        }),
+        { 
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     const botToken = import.meta.env.TELEGRAM_BOT_TOKEN;
     
     if (!botToken) {

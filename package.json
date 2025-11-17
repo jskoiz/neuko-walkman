@@ -7,11 +7,13 @@
     "dev": "npm run generate-playlists && concurrently -n \"astro,bot\" -c \"cyan,magenta\" \"lsof -ti:4321 | xargs kill -9 2>/dev/null || true && astro dev\" \"tsx scripts/test-bot-local.ts\"",
     "dev:astro": "lsof -ti:4321 | xargs kill -9 2>/dev/null || true && npm run generate-playlists && astro dev",
     "dev:bot": "tsx scripts/test-bot-local.ts",
+    "bot:local": "tsx scripts/test-bot-local.ts",
     "build": "npm run generate-playlists && astro build",
     "preview": "astro preview",
     "astro": "astro",
     "test-bot": "tsx scripts/test-bot-local.ts",
-    "setup-webhook": "bash scripts/setup-webhook.sh"
+    "setup-webhook": "bash scripts/setup-webhook.sh",
+    "delete-webhook": "bash scripts/delete-webhook.sh"
   },
   "dependencies": {
     "@astrojs/react": "^4.4.2",

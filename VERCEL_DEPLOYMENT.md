@@ -15,17 +15,21 @@ If your Vercel deployment shows "Authentication Required", you need to **disable
 
 ## How the Telegram Bot Works on Vercel
 
-**Important:** The bot runs automatically on Vercel via **webhook**, not polling. You don't need to run it locally or as a separate process.
+**Important:** 
+- **Production:** The bot runs automatically on Vercel via **webhook** (serverless)
+- **Dev/Preview:** Webhooks are **disabled** - run the bot locally with `npm run bot:local`
 
 ### How It Works
 
-1. **Local Development (Polling Mode):**
-   - Run `npm run dev` or `npm run dev:bot`
+1. **Local Development / Dev Branch (Polling Mode):**
+   - Run `npm run bot:local` or `npm run dev:bot`
+   - Bot automatically deletes webhook if one exists
    - Bot continuously polls Telegram for new messages
-   - Good for testing and development
+   - Perfect for development and testing
 
 2. **Vercel Production (Webhook Mode):**
    - Bot is deployed as an API route: `/api/telegram-webhook`
+   - **Only works on production deployments** (dev/preview deployments reject webhooks)
    - Telegram sends updates directly to your Vercel URL
    - No separate process needed - it's serverless!
 
@@ -57,16 +61,19 @@ Go to Vercel Dashboard → Your Project → Settings → Environment Variables:
 - `MAX_FILE_SIZE` - Max file size in bytes (default: 52428800 = 50MB)
 - `DREAMHOST_USE_SFTP` - Set to "true" if using SFTP instead of FTP
 
-### 3. Set Up Telegram Webhook
+### 3. Set Up Telegram Webhook (PRODUCTION ONLY)
 
-After deployment, configure Telegram to send updates to your Vercel URL:
+⚠️ **IMPORTANT:** Only set webhook for **PRODUCTION** deployments! Dev/preview deployments will reject webhook requests automatically.
 
-**Your Vercel URL:** `https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app`
+After **production** deployment, configure Telegram to send updates to your Vercel URL:
+
+**Your Production Vercel URL:** `https://your-app.vercel.app` (NOT the preview/dev URL)
 
 **Option A: Using the script (easiest)**
 ```bash
 # Make sure TELEGRAM_BOT_TOKEN is in your .env file
-npm run setup-webhook https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app [your-webhook-secret]
+# Script will warn if you try to use a dev/preview URL
+npm run setup-webhook https://your-production-app.vercel.app [your-webhook-secret]
 ```
 
 **Option B: Using curl manually**
@@ -151,11 +158,15 @@ You should see:
 
 ## Important Notes
 
-- **You don't need to run the bot locally** for production - it works automatically on Vercel
-- The webhook endpoint is at: `https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app/api/telegram-webhook`
-- After setting the webhook, Telegram will send ALL bot messages to your Vercel deployment
-- If you want to test locally while webhook is active, you'll need to delete the webhook first:
+- **Production:** You don't need to run the bot locally - it works automatically on Vercel via webhook
+- **Dev Branch:** Webhooks are automatically disabled. Use `npm run bot:local` to run locally
+- The webhook endpoint is at: `https://your-production-app.vercel.app/api/telegram-webhook`
+- **Dev/preview deployments will reject webhook requests** (returns 403) - this is intentional
+- After setting the webhook, Telegram will send ALL bot messages to your production Vercel deployment
+- To delete webhook for local testing:
   ```bash
+  npm run delete-webhook
+  # or manually:
   curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/deleteWebhook"
   ```
 

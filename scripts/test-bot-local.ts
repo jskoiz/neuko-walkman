@@ -31,6 +31,55 @@ const userSessions = new Map<number, 'waiting_for_url'>();
 let lastUpdateId = 0;
 
 /**
+ * Check if webhook is set
+ */
+async function checkWebhook(): Promise<{ url?: string; pending_update_count?: number } | null> {
+  try {
+    const response = await fetch(`${TELEGRAM_API_URL}${botToken}/getWebhookInfo`);
+    const data = await response.json();
+    if (data.ok && data.result.url && data.result.url !== '') {
+      return data.result;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error checking webhook:', error);
+    return null;
+  }
+}
+
+/**
+ * Verify webhook is actually deleted
+ */
+async function verifyWebhookDeleted(maxAttempts: number = 5): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const webhookInfo = await checkWebhook();
+    if (!webhookInfo || !webhookInfo.url) {
+      return true; // Webhook is deleted
+    }
+    if (i < maxAttempts - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+    }
+  }
+  return false; // Webhook still exists after all attempts
+}
+
+/**
+ * Delete webhook to enable polling
+ */
+async function deleteWebhook(): Promise<boolean> {
+  try {
+    const response = await fetch(`${TELEGRAM_API_URL}${botToken}/deleteWebhook`, {
+      method: 'POST',
+    });
+    const data = await response.json();
+    return data.ok === true;
+  } catch (error) {
+    console.error('Error deleting webhook:', error);
+    return false;
+  }
+}
+
+/**
  * Get updates from Telegram
  */
 async function getUpdates(): Promise<any[]> {
@@ -39,13 +88,25 @@ async function getUpdates(): Promise<any[]> {
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Telegram API error: ${response.statusText}`);
+      const errorText = await response.text();
+      if (response.status === 409 || errorText.includes('Conflict')) {
+        throw new Error('CONFLICT: Webhook is active. Please delete webhook first or use webhook mode.');
+      }
+      throw new Error(`Telegram API error: ${response.statusText} - ${errorText}`);
     }
     
     const data = await response.json();
+    if (!data.ok) {
+      throw new Error(`Telegram API error: ${data.description || 'Unknown error'}`);
+    }
     return data.result || [];
-  } catch (error) {
-    console.error('Error fetching updates:', error);
+  } catch (error: any) {
+    // Re-throw conflict errors so they can be handled by the polling loop
+    if (error.message && error.message.includes('CONFLICT')) {
+      throw error;
+    }
+    // For other errors, log and return empty array
+    console.error('Error fetching updates:', error.message || error);
     return [];
   }
 }
@@ -211,7 +272,7 @@ async function handleStartCommand(chatId: number, username?: string): Promise<vo
   const welcomeText = `Greetings Operative ${displayName}\n\n` +
     `Share your favorite songs with the community.\n\n` +
     `Click the button below to add a song:\n\n` +
-    `You can listen to all the Neuko sounds at <a href="https://bloc.rocks">https://bloc.rocks</a>`;
+    `You can listen to all the Neuko sounds <a href="https://bloc.rocks">here</a>`;
 
   // For local testing, read the file from disk and send as Buffer
   // For production, use a public URL
@@ -357,10 +418,56 @@ async function main() {
     process.exit(1);
   }
 
+  // Check for active webhook and delete it to enable polling
+  let webhookInfo = await checkWebhook();
+  if (webhookInfo && webhookInfo.url) {
+    console.log(`⚠️  Webhook detected: ${webhookInfo.url}`);
+    
+    // Check if webhook points to a dev/preview URL
+    if (webhookInfo.url.includes('git-dev') || webhookInfo.url.includes('preview') || webhookInfo.url.includes('-dev-')) {
+      console.log('⚠️  Warning: Webhook is pointing to a dev/preview URL!');
+      console.log('💡 Dev/preview deployments reject webhooks automatically.');
+      console.log('💡 You should only set webhooks for PRODUCTION deployments.');
+    }
+    
+    console.log('🔄 Deleting webhook to enable polling mode...');
+    
+    const deleted = await deleteWebhook();
+    if (deleted) {
+      console.log('⏳ Verifying webhook deletion...');
+      const verified = await verifyWebhookDeleted();
+      if (verified) {
+        console.log('✅ Webhook deleted and verified. Polling mode enabled.');
+        if (webhookInfo.pending_update_count && webhookInfo.pending_update_count > 0) {
+          console.log(`⚠️  Note: ${webhookInfo.pending_update_count} pending updates were lost.`);
+        }
+      } else {
+        console.error('⚠️  Warning: Webhook deletion reported success but webhook still exists.');
+        console.error('💡 This may be due to Vercel automatically re-enabling it.');
+        console.error('💡 Make sure webhook is only set for PRODUCTION, not dev/preview.');
+        console.error('💡 Try: npm run delete-webhook');
+      }
+    } else {
+      console.error('❌ Failed to delete webhook. Please delete it manually:');
+      console.error(`   npm run delete-webhook`);
+      console.error(`   or: curl -X POST "https://api.telegram.org/bot${botToken}/deleteWebhook"`);
+      process.exit(1);
+    }
+    console.log('');
+  } else {
+    console.log('✅ No webhook detected. Polling mode ready.');
+    console.log('');
+  }
+
   // Polling loop
+  let conflictCount = 0;
+  let consecutiveErrors = 0;
+  
   while (true) {
     try {
       const updates = await getUpdates();
+      conflictCount = 0; // Reset conflict count on success
+      consecutiveErrors = 0; // Reset error count on success
       
       for (const update of updates) {
         lastUpdateId = update.update_id;
@@ -376,8 +483,68 @@ async function main() {
           await handleMessage(update.message);
         }
       }
-    } catch (error) {
-      console.error('Error in polling loop:', error);
+    } catch (error: any) {
+      const errorMessage = error.message || String(error);
+      
+      if (errorMessage.includes('CONFLICT') || errorMessage.includes('Conflict')) {
+        conflictCount++;
+        consecutiveErrors++;
+        
+        if (conflictCount >= 3) {
+          console.error('\n❌ Persistent conflict error. Webhook may have been re-enabled.');
+          console.error('💡 Checking current webhook status...');
+          
+          const currentWebhook = await checkWebhook();
+          if (currentWebhook && currentWebhook.url) {
+            console.error(`⚠️  Webhook is active: ${currentWebhook.url}`);
+            console.error('💡 Attempting to delete webhook automatically...');
+            
+            const deleted = await deleteWebhook();
+            if (deleted) {
+              console.log('⏳ Verifying webhook deletion...');
+              const verified = await verifyWebhookDeleted();
+              if (verified) {
+                console.log('✅ Webhook deleted and verified. Retrying polling...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                conflictCount = 0; // Reset and try again
+                continue;
+              } else {
+                console.error('⚠️  Webhook deletion reported success but webhook still exists.');
+                console.error('💡 This may be due to Vercel automatically re-enabling it.');
+                console.error('💡 The webhook is likely being set by your Vercel deployment.');
+                console.error('💡 Solution: Make sure webhook is only set for PRODUCTION, not dev/preview.');
+                console.error('💡 Or run: npm run delete-webhook');
+                // Don't exit, keep trying but with longer delay
+                await new Promise(resolve => setTimeout(resolve, 10000));
+                conflictCount = 0; // Reset counter but keep trying
+                continue;
+              }
+            } else {
+              console.error('❌ Failed to delete webhook automatically.');
+              console.error('💡 Please delete it manually:');
+              console.error(`   npm run delete-webhook`);
+              console.error(`   or: curl -X POST "https://api.telegram.org/bot${botToken}/deleteWebhook"`);
+              process.exit(1);
+            }
+          } else {
+            console.error('⚠️  No webhook detected, but still getting conflicts.');
+            console.error('💡 This may be a temporary Telegram API issue. Waiting longer...');
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            conflictCount = 0; // Reset and try again
+            continue;
+          }
+        }
+        console.error(`⚠️  Conflict detected (${conflictCount}/3). Retrying...`);
+      } else {
+        consecutiveErrors++;
+        console.error(`Error in polling loop (${consecutiveErrors}):`, errorMessage);
+        
+        // If we get too many consecutive errors, exit
+        if (consecutiveErrors >= 10) {
+          console.error('\n❌ Too many consecutive errors. Exiting.');
+          process.exit(1);
+        }
+      }
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before retrying
     }
   }
