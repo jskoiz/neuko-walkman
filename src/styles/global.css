@@ -22,7 +22,7 @@ body {
   position: fixed;
   top: 20px;
   left: 20px;
-  height: 192px;
+  height: 122px;
   width: auto;
   max-width: calc(100vw - 40px);
   max-height: calc(100vh - 40px);
@@ -106,7 +106,7 @@ body {
 @media (max-width: 768px) {
   .page-footer {
     bottom: 10px;
-    font-size: 0.7rem;
+    font-size: 0.85rem;
   }
 }
 
