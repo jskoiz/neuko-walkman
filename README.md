@@ -40,7 +40,7 @@ npm run dev:bot    # Just the Telegram bot (polling mode)
    - `DREAMHOST_FTP_USER` - FTP username
    - `DREAMHOST_FTP_PASSWORD` - FTP password
    - `DREAMHOST_FTP_PATH` - Remote path for music files
-   - `PUBLIC_SITE_URL` - Your Vercel deployment URL
+   - `PUBLIC_SITE_URL` - Your Vercel deployment URL: `https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app`
    - `MAX_FILE_SIZE` - Optional, default 52428800 (50MB)
 
 2. **Deploy to Vercel:**
@@ -50,10 +50,14 @@ npm run dev:bot    # Just the Telegram bot (polling mode)
 
 3. **Set Telegram Webhook** after deployment:
    ```bash
+   # Easy way - using the script (make sure TELEGRAM_BOT_TOKEN is in .env)
+   npm run setup-webhook https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app
+   
+   # Or manually with curl
    curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
      -H "Content-Type: application/json" \
      -d '{
-       "url": "https://your-site.vercel.app/api/telegram-webhook",
+       "url": "https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app/api/telegram-webhook",
        "secret_token": "your-secret-token-here"
      }'
    ```

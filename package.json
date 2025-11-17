@@ -10,7 +10,8 @@
     "build": "npm run generate-playlists && astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "test-bot": "tsx scripts/test-bot-local.ts"
+    "test-bot": "tsx scripts/test-bot-local.ts",
+    "setup-webhook": "bash scripts/setup-webhook.sh"
   },
   "dependencies": {
     "@astrojs/react": "^4.4.2",
