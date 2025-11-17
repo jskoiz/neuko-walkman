@@ -1,28 +1,94 @@
 {
   "playlists": [
     {
-      "name": "metalcore",
-      "path": "/music/metalcore",
+      "name": "NEUKO",
+      "path": "/music/NEUKO",
       "index": 1,
-      "total": 3,
+      "total": 5,
       "tracks": [
         {
           "trackNumber": 1,
+          "trackName": "anthem",
+          "fileName": "/music/NEUKO/anthem.mp3",
+          "duration": "0:00",
+          "playlistName": "NEUKO",
+          "playlistIndex": 1,
+          "playlistTotal": 5,
+          "playlistPath": "/music/NEUKO"
+        }
+      ]
+    },
+    {
+      "name": "metalcore",
+      "path": "/music/metalcore",
+      "index": 2,
+      "total": 5,
+      "tracks": [
+        {
+          "trackNumber": 1,
+          "trackName": "RATATATA",
+          "fileName": "/music/metalcore/RATATATA.mp3",
+          "duration": "0:00",
+          "playlistName": "metalcore",
+          "playlistIndex": 2,
+          "playlistTotal": 5,
+          "playlistPath": "/music/metalcore"
+        },
+        {
+          "trackNumber": 2,
           "trackName": "d1H2uKFea5J2vvDR",
           "fileName": "/music/metalcore/d1H2uKFea5J2vvDR.mp3",
           "duration": "0:00",
           "playlistName": "metalcore",
-          "playlistIndex": 1,
-          "playlistTotal": 3,
+          "playlistIndex": 2,
+          "playlistTotal": 5,
           "playlistPath": "/music/metalcore"
+        },
+        {
+          "trackNumber": 3,
+          "trackName": "elevator operator",
+          "fileName": "/music/metalcore/elevator operator.mp3",
+          "duration": "0:00",
+          "playlistName": "metalcore",
+          "playlistIndex": 2,
+          "playlistTotal": 5,
+          "playlistPath": "/music/metalcore"
+        }
+      ]
+    },
+    {
+      "name": "miter leaks",
+      "path": "/music/miter leaks",
+      "index": 3,
+      "total": 5,
+      "tracks": [
+        {
+          "trackNumber": 1,
+          "trackName": "G-304_MISSION_DEBRIEF_SUMMARY ",
+          "fileName": "/music/miter leaks/G-304_MISSION_DEBRIEF_SUMMARY .mp3",
+          "duration": "0:00",
+          "playlistName": "miter leaks",
+          "playlistIndex": 3,
+          "playlistTotal": 5,
+          "playlistPath": "/music/miter leaks"
+        },
+        {
+          "trackNumber": 2,
+          "trackName": "RAVEL_LECTURE_GRAVITY_DIVINITY_HIGHCLEARANCE_ONLY -",
+          "fileName": "/music/miter leaks/RAVEL_LECTURE_GRAVITY_DIVINITY_HIGHCLEARANCE_ONLY -.mp3",
+          "duration": "0:00",
+          "playlistName": "miter leaks",
+          "playlistIndex": 3,
+          "playlistTotal": 5,
+          "playlistPath": "/music/miter leaks"
         }
       ]
     },
     {
       "name": "podcast",
       "path": "/music/podcast",
-      "index": 2,
-      "total": 3,
+      "index": 4,
+      "total": 5,
       "tracks": [
         {
           "trackNumber": 1,
@@ -30,8 +96,8 @@
           "fileName": "/music/podcast/claydudes.mp3",
           "duration": "0:00",
           "playlistName": "podcast",
-          "playlistIndex": 2,
-          "playlistTotal": 3,
+          "playlistIndex": 4,
+          "playlistTotal": 5,
           "playlistPath": "/music/podcast"
         }
       ]
@@ -39,8 +105,8 @@
     {
       "name": "ringtonez",
       "path": "/music/ringtonez",
-      "index": 3,
-      "total": 3,
+      "index": 5,
+      "total": 5,
       "tracks": [
         {
           "trackNumber": 1,
@@ -48,8 +114,8 @@
           "fileName": "/music/ringtonez/G_THEME_RINGTONE_2_BYKAPZ.mp3",
           "duration": "0:00",
           "playlistName": "ringtonez",
-          "playlistIndex": 3,
-          "playlistTotal": 3,
+          "playlistIndex": 5,
+          "playlistTotal": 5,
           "playlistPath": "/music/ringtonez"
         },
         {
@@ -58,8 +124,8 @@
           "fileName": "/music/ringtonez/G_THEME_RINGTONE_BYKAPZ.mp3",
           "duration": "0:00",
           "playlistName": "ringtonez",
-          "playlistIndex": 3,
-          "playlistTotal": 3,
+          "playlistIndex": 5,
+          "playlistTotal": 5,
           "playlistPath": "/music/ringtonez"
         }
       ]

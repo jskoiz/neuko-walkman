@@ -5,6 +5,7 @@ import type { Track } from "../types/track";
 import type { Playlist } from "../types/track";
 import "../styles/global.css";
 import playlistsData from "../config/playlists.json";
+import Analytics from "@vercel/analytics";
 
 const playlists: Playlist[] = playlistsData.playlists || [];
 const allTracks: Track[] = playlists.flatMap((playlist) => playlist.tracks);
@@ -36,6 +37,7 @@ const tracks = validateTracks(allTracks);
     />
   </head>
   <body>
+    <Analytics />
     <img src="/neuko-logo.png" alt="Neuko" class="neuko-logo" />
     <main>
       <CDPlayerInterface client:load tracks={tracks} />
