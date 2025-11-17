@@ -269,6 +269,25 @@ async function handleMessage(
 }
 
 /**
+ * GET handler - returns info about the webhook endpoint
+ */
+export const GET: APIRoute = async () => {
+  return new Response(
+    JSON.stringify({
+      status: 'ok',
+      message: 'Telegram webhook endpoint is active. Use POST to send updates.',
+      endpoint: '/api/telegram-webhook',
+    }),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+};
+
+/**
  * Main webhook handler
  */
 export const POST: APIRoute = async ({ request }) => {
