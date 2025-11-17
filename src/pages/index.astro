@@ -5,7 +5,7 @@ import type { Track } from "../types/track";
 import type { Playlist } from "../types/track";
 import "../styles/global.css";
 import playlistsData from "../config/playlists.json";
-import Analytics from "@vercel/analytics";
+import Analytics from "@vercel/analytics/astro";
 
 const playlists: Playlist[] = playlistsData.playlists || [];
 const allTracks: Track[] = playlists.flatMap((playlist) => playlist.tracks);
