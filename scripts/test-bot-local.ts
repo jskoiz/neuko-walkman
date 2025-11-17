@@ -6,6 +6,7 @@
 
 import {
   sendMessage,
+  sendPhoto,
   answerCallbackQuery,
   createInlineKeyboard,
   isValidSongUrl,
@@ -14,6 +15,8 @@ import { downloadSongAsBuffer } from '../src/utils/download-song';
 import { uploadToDreamhost } from '../src/utils/upload-to-dreamhost';
 import { checkRateLimit, getResetTime } from '../src/utils/rate-limiter';
 import dotenv from 'dotenv';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -197,16 +200,41 @@ async function processSongSubmission(chatId: number, url: string): Promise<void>
 /**
  * Handle /start command
  */
-async function handleStartCommand(chatId: number): Promise<void> {
+async function handleStartCommand(chatId: number, username?: string): Promise<void> {
   const keyboard = createInlineKeyboard([
     [{ text: '➕ Add New Song', callback_data: 'add_song' }],
   ]);
 
-  const welcomeText = `🎵 <b>Welcome to the Community Playlist Bot!</b>\n\n` +
+  // Get username or use "Operative" as fallback
+  const displayName = username ? `@${username}` : 'Operative';
+  
+  const welcomeText = `Greetings Operative ${displayName}\n\n` +
     `Share your favorite songs with the community.\n\n` +
-    `Click the button below to add a song:`;
+    `Click the button below to add a song:\n\n` +
+    `You can listen to all the Neuko sounds at <a href="https://bloc.rocks">https://bloc.rocks</a>`;
 
-  await sendMessage(botToken, chatId, welcomeText, keyboard);
+  // For local testing, read the file from disk and send as Buffer
+  // For production, use a public URL
+  let photo: string | Buffer | null = null;
+  
+  // For local testing script, ALWAYS read file from disk as Buffer
+  // Telegram can't access localhost URLs, so we must send the file directly
+  // This is a local testing script, so we always use Buffer regardless of env vars
+  const photoPath = join(process.cwd(), 'public', 'vending-machines.jpg');
+  try {
+    photo = await readFile(photoPath);
+  } catch (error) {
+    console.error('Failed to read photo file:', error);
+    // For local testing, if file doesn't exist, send message without photo
+    photo = null;
+  }
+
+  // Send photo if available, otherwise just send the message
+  if (photo) {
+    await sendPhoto(botToken, chatId, photo, welcomeText, keyboard);
+  } else {
+    await sendMessage(botToken, chatId, welcomeText, keyboard);
+  }
 }
 
 /**
@@ -287,7 +315,8 @@ async function handleMessage(message: any): Promise<void> {
 
   // Handle /start command
   if (text.startsWith('/start')) {
-    await handleStartCommand(chatId);
+    const username = message.from?.username;
+    await handleStartCommand(chatId, username);
     return;
   }
 

@@ -4,7 +4,9 @@
   "version": "0.0.1",
   "scripts": {
     "generate-playlists": "node scripts/generate-playlists.js",
-    "dev": "lsof -ti:4321 | xargs kill -9 2>/dev/null || true && npm run generate-playlists && astro dev",
+    "dev": "npm run generate-playlists && concurrently -n \"astro,bot\" -c \"cyan,magenta\" \"lsof -ti:4321 | xargs kill -9 2>/dev/null || true && astro dev\" \"tsx scripts/test-bot-local.ts\"",
+    "dev:astro": "lsof -ti:4321 | xargs kill -9 2>/dev/null || true && npm run generate-playlists && astro dev",
+    "dev:bot": "tsx scripts/test-bot-local.ts",
     "build": "npm run generate-playlists && astro build",
     "preview": "astro preview",
     "astro": "astro",
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "concurrently": "^9.2.1",
     "dotenv": "^17.2.3",
     "tsx": "^4.20.6"
   }

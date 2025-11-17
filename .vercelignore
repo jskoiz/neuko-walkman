@@ -1,0 +1,23 @@
+# Local development files
+.env
+.env.local
+.env.*.local
+
+# Test files
+scripts/test-bot-local.ts
+
+# Node modules (handled by Vercel)
+node_modules
+
+# Git files
+.git
+.gitignore
+
+# Documentation (optional, but reduces deployment size)
+*.md
+!README.md
+
+# Local testing files
+LOCAL_TESTING.md
+TELEGRAM_BOT_SETUP.md
+

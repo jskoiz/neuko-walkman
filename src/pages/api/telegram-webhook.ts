@@ -6,6 +6,7 @@
 import type { APIRoute } from 'astro';
 import {
   sendMessage,
+  sendPhoto,
   answerCallbackQuery,
   editMessageText,
   createInlineKeyboard,
@@ -137,20 +138,34 @@ async function processSongSubmission(
 async function handleStartCommand(
   botToken: string,
   chatId: number,
-  messageId?: number
+  messageId?: number,
+  username?: string
 ): Promise<void> {
   const keyboard = createInlineKeyboard([
     [{ text: '➕ Add New Song', callback_data: 'add_song' }],
   ]);
 
-  const welcomeText = `🎵 <b>Welcome to the Community Playlist Bot!</b>\n\n` +
+  // Get username or use "Operative" as fallback
+  const displayName = username ? `@${username}` : 'Operative';
+  
+  const welcomeText = `Greetings Operative ${displayName}\n\n` +
     `Share your favorite songs with the community.\n\n` +
-    `Click the button below to add a song:`;
+    `Click the button below to add a song:\n\n` +
+    `You can listen to all the Neuko sounds at <a href="https://bloc.rocks">https://bloc.rocks</a>`;
+
+  // Photo URL - can be set via env var or defaults to bloc.rocks
+  // Image is available at /vending-machines.jpg
+  // Or set TELEGRAM_WELCOME_PHOTO_URL env var to use a custom URL
+  const photoUrl = import.meta.env.TELEGRAM_WELCOME_PHOTO_URL || 
+    (import.meta.env.PUBLIC_SITE_URL 
+      ? `${import.meta.env.PUBLIC_SITE_URL}/vending-machines.jpg`
+      : 'https://bloc.rocks/vending-machines.jpg');
 
   if (messageId) {
-    await editMessageText(botToken, chatId, messageId, welcomeText, keyboard);
+    // Can't edit photo messages, so send new message
+    await sendPhoto(botToken, chatId, photoUrl, welcomeText, keyboard);
   } else {
-    await sendMessage(botToken, chatId, welcomeText, keyboard);
+    await sendPhoto(botToken, chatId, photoUrl, welcomeText, keyboard);
   }
 }
 
@@ -240,7 +255,8 @@ async function handleMessage(
 
   // Handle /start command
   if (text.startsWith('/start')) {
-    await handleStartCommand(botToken, chatId);
+    const username = message.from?.username;
+    await handleStartCommand(botToken, chatId, undefined, username);
     return;
   }
 

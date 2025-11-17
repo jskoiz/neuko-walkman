@@ -128,6 +128,107 @@ export async function editMessageText(
 }
 
 /**
+ * Send a photo to a Telegram chat
+ */
+export async function sendPhoto(
+  botToken: string,
+  chatId: number,
+  photo: string | Buffer, // URL or file buffer
+  caption?: string,
+  replyMarkup?: any
+): Promise<void> {
+  const url = `${TELEGRAM_API_URL}${botToken}/sendPhoto`;
+  
+  // Check if photo is a Buffer (more reliable than typeof check)
+  const isBuffer = Buffer.isBuffer(photo);
+  
+  // If photo is a URL string, send it directly
+  if (!isBuffer && typeof photo === 'string') {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        photo,
+        caption,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Telegram API error: ${error}`);
+    }
+  } else {
+    // If photo is a Buffer, use FormData with native https module
+    // Node.js fetch doesn't handle form-data streams well, so use https directly
+    const FormDataModule = await import('form-data');
+    const FormData = FormDataModule.default;
+    const https = await import('https');
+    const { URL } = await import('url');
+    
+    const form = new FormData();
+    
+    form.append('chat_id', chatId.toString());
+    form.append('photo', photo, {
+      filename: 'vending-machines.jpg',
+      contentType: 'image/jpeg',
+    });
+    
+    if (caption) {
+      form.append('caption', caption);
+    }
+    if (replyMarkup) {
+      form.append('reply_markup', JSON.stringify(replyMarkup));
+    }
+
+    // Get headers from form-data
+    const headers = form.getHeaders();
+
+    // Parse URL and make request with https module
+    const parsedUrl = new URL(url);
+    
+    return new Promise<void>((resolve, reject) => {
+      const req = https.request(
+        {
+          hostname: parsedUrl.hostname,
+          path: parsedUrl.pathname + parsedUrl.search,
+          method: 'POST',
+          headers: headers,
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+          res.on('end', () => {
+            try {
+              const result = JSON.parse(data);
+              if (!result.ok) {
+                reject(new Error(`Telegram API error: ${JSON.stringify(result)}`));
+              } else {
+                resolve();
+              }
+            } catch (error) {
+              reject(new Error(`Failed to parse response: ${error}`));
+            }
+          });
+        }
+      );
+
+      req.on('error', (error) => {
+        reject(new Error(`Request error: ${error.message}`));
+      });
+
+      form.pipe(req);
+    });
+  }
+}
+
+/**
  * Create inline keyboard markup
  */
 export function createInlineKeyboard(buttons: Array<Array<{ text: string; callback_data: string }>>) {
