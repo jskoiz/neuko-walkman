@@ -172,7 +172,10 @@ export async function deleteFromDreamhost(
   fileName: string,
   options: UploadOptions
 ): Promise<void> {
-  const remoteFilePath = `${options.remotePath}/${fileName}`;
+  // Normalize filename to lowercase to match how files are stored on server
+  // (uploaded files are sanitized and converted to lowercase via sanitizeFileName)
+  const normalizedFileName = fileName.toLowerCase();
+  const remoteFilePath = `${options.remotePath}/${normalizedFileName}`;
   
   if (options.useSFTP) {
     await deleteViaSFTP(remoteFilePath, options);

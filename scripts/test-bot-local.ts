@@ -188,12 +188,30 @@ async function getUpdates(): Promise<any[]> {
     if (error.name === 'AbortError') {
       // Timeout is expected for long polling - return empty array
       return [];
-    } else if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.message?.includes('fetch failed')) {
-      // Transient network errors - return empty array and retry
+    }
+    
+    // Check for network errors in multiple ways (code, message, or wrapped)
+    const errorMessage = error.message || String(error);
+    const errorCode = error.code || error.errno;
+    const isNetworkError = 
+      errorCode === 'ECONNRESET' || 
+      errorCode === 'ETIMEDOUT' || 
+      errorCode === 'ENOTFOUND' ||
+      errorCode === 'ECONNREFUSED' ||
+      errorMessage.includes('ECONNRESET') ||
+      errorMessage.includes('ETIMEDOUT') ||
+      errorMessage.includes('fetch failed') ||
+      errorMessage.includes('network') ||
+      errorMessage.includes('connection');
+    
+    if (isNetworkError) {
+      // Transient network errors - return empty array and retry silently
+      // These are expected and don't need to be logged as errors
       return [];
     }
+    
     // For other errors, log and return empty array
-    console.error('[bot] Error fetching updates:', error.message || error);
+    console.error('[bot] Error fetching updates:', errorMessage);
     return [];
   }
 }
@@ -1182,6 +1200,26 @@ async function main() {
       }
     } catch (error: any) {
       const errorMessage = error.message || String(error);
+      const errorCode = error.code || error.errno;
+      
+      // Check if this is a network error (transient, should be handled silently)
+      const isNetworkError = 
+        errorCode === 'ECONNRESET' || 
+        errorCode === 'ETIMEDOUT' || 
+        errorCode === 'ENOTFOUND' ||
+        errorCode === 'ECONNREFUSED' ||
+        errorMessage.includes('ECONNRESET') ||
+        errorMessage.includes('ETIMEDOUT') ||
+        errorMessage.includes('fetch failed') ||
+        errorMessage.includes('network') ||
+        errorMessage.includes('connection');
+      
+      if (isNetworkError) {
+        // Network errors are transient and expected - don't count as consecutive errors
+        // Just wait a bit and retry
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
       
       if (errorMessage.includes('CONFLICT') || errorMessage.includes('Conflict')) {
         conflictCount++;
