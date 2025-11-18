@@ -21,3 +21,8 @@ node_modules
 LOCAL_TESTING.md
 TELEGRAM_BOT_SETUP.md
 
+# Telegram bot - LOCAL ONLY (not deployed to Vercel)
+src/pages/api/telegram-webhook.ts
+
+
+

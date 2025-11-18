@@ -1,5 +1,14 @@
 # Local Testing Guide
 
+## ⚠️ Important: Telegram Bot is Local-Only
+
+**The Telegram bot runs locally only and is NOT deployed to Vercel.**
+
+- The webhook handler (`src/pages/api/telegram-webhook.ts`) is excluded from Vercel deployment
+- The bot uses polling mode when running locally (see `scripts/test-bot-local.ts`)
+- This prevents conflicts between local testing and Vercel deployments
+- Double messages were caused by both local and Vercel instances running simultaneously
+
 ## Prerequisites
 
 Before testing locally, make sure you have:
@@ -34,8 +43,12 @@ Before testing locally, make sure you have:
 
 3. **Start the bot in polling mode:**
    ```bash
+   npm run bot:local
+   # or
    npm run test-bot
    ```
+   
+   **Note:** The bot will automatically delete any active webhooks to enable polling mode.
 
 4. **Test the bot:**
    - Open Telegram and find your bot: `@thebloc_bot`
@@ -113,7 +126,20 @@ Press `Ctrl+C` in the terminal where the bot is running.
 ## Next Steps
 
 After successful local testing:
-1. Deploy to Vercel
-2. Set up webhook (see TELEGRAM_BOT_SETUP.md)
-3. Configure environment variables in Vercel dashboard
+1. Deploy the website to Vercel (the Telegram bot stays local-only)
+2. The bot will continue running locally using polling mode
+3. If you want to deploy the bot elsewhere in the future, you can use the webhook handler as a reference
+
+## Why Local-Only?
+
+The Telegram bot is kept local-only to:
+- Prevent conflicts between local testing and Vercel deployments
+- Avoid double messages from multiple instances
+- Simplify the deployment process
+- Keep bot functionality separate from the website deployment
+
+If you need to deploy the bot to a server in the future, you can:
+1. Use the webhook handler code as a reference
+2. Deploy to a separate service (not Vercel)
+3. Set up the webhook using `scripts/setup-webhook.sh`
 

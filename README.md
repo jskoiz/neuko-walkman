@@ -27,51 +27,35 @@ npm run dev:bot    # Just the Telegram bot (polling mode)
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build locally
 - `npm run test-bot` - Test Telegram bot in polling mode (alias for dev:bot)
-- `npm run setup-webhook` - Set webhook for PRODUCTION deployment only
+- `npm run setup-webhook` - Set webhook (for future deployment elsewhere, not Vercel)
 - `npm run delete-webhook` - Delete webhook (for local development)
 
 ## Deployment
 
 ### Vercel Deployment
 
-1. **Set Environment Variables** in Vercel dashboard:
-   - `TELEGRAM_BOT_TOKEN` - Your Telegram bot token
-   - `TELEGRAM_WEBHOOK_SECRET` - Optional webhook secret for security
-   - `SPOTIPY_CLIENT_ID` - Spotify API client ID
-   - `SPOTIPY_CLIENT_SECRET` - Spotify API client secret
+⚠️ **Important:** The Telegram bot is **local-only** and is NOT deployed to Vercel. This prevents conflicts and double messages.
+
+1. **Set Environment Variables** in Vercel dashboard (for website only):
+   - `SPOTIPY_CLIENT_ID` - Spotify API client ID (if needed for website features)
+   - `SPOTIPY_CLIENT_SECRET` - Spotify API secret (if needed for website features)
    - `DREAMHOST_FTP_HOST` - FTP host (e.g., files.bloc.rocks)
    - `DREAMHOST_FTP_USER` - FTP username
    - `DREAMHOST_FTP_PASSWORD` - FTP password
    - `DREAMHOST_FTP_PATH` - Remote path for music files
-   - `PUBLIC_SITE_URL` - Your Vercel deployment URL: `https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app`
+   - `PUBLIC_SITE_URL` - Your Vercel deployment URL
    - `MAX_FILE_SIZE` - Optional, default 52428800 (50MB)
+
+   **Note:** Telegram bot environment variables (`TELEGRAM_BOT_TOKEN`, etc.) are only needed locally, not in Vercel.
 
 2. **Deploy to Vercel:**
    ```bash
    vercel --prod
    ```
 
-3. **Set Telegram Webhook** after PRODUCTION deployment:
-   ```bash
-   # ⚠️ IMPORTANT: Only use for PRODUCTION deployments!
-   # Dev/preview deployments will reject webhook requests automatically
-   # For dev branch, use: npm run bot:local
-   
-   # Easy way - using the script (make sure TELEGRAM_BOT_TOKEN is in .env)
-   npm run setup-webhook https://your-production-app.vercel.app
-   
-   # Or manually with curl
-   curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "url": "https://your-production-app.vercel.app/api/telegram-webhook",
-       "secret_token": "your-secret-token-here"
-     }'
-   ```
+### Telegram Bot (Local Only)
 
-### Dev Branch / Local Development
-
-**For dev branch:** The webhook endpoint automatically rejects requests on dev/preview deployments. Run the bot locally instead:
+**The Telegram bot runs locally only** using polling mode. It is excluded from Vercel deployment to prevent conflicts.
 
 ```bash
 # Run bot locally (automatically deletes webhook if needed)
@@ -81,5 +65,10 @@ npm run bot:local
 npm run delete-webhook
 npm run bot:local
 ```
+
+The bot will:
+- Automatically delete any active webhooks to enable polling mode
+- Run continuously until stopped (Ctrl+C)
+- Handle all bot interactions locally
 
 See [TELEGRAM_BOT_SETUP.md](./TELEGRAM_BOT_SETUP.md) for detailed setup instructions.
