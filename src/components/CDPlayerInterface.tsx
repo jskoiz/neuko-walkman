@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { Track } from '../types/track';
 import { useAudioPlayer } from './AudioPlayer';
 import { Display } from './Display';
+import { ControlButtonArray } from './ControlButtonArray';
+import { PlaylistPanel } from './PlaylistPanel';
 import '../styles/cd-player.css';
 
 interface CDPlayerInterfaceProps {
@@ -11,6 +13,7 @@ interface CDPlayerInterfaceProps {
 export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
   const [buttonPressed, setButtonPressed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [panelVisible, setPanelVisible] = useState(false);
   
   const {
     currentTrack,
@@ -31,9 +34,11 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
     increaseVolume,
     decreaseVolume,
     togglePlayPause,
+    selectTrack,
     formattedCurrentTime,
     formattedDuration,
     totalTracks,
+    currentPlaylistTracks,
   } = useAudioPlayer(tracks);
 
   const handleButtonClick = async (action: string, handler: () => void | Promise<void>) => {
@@ -152,6 +157,34 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
             />
           </div>
         </div>
+      </div>
+      
+      <div className="button-array-container">
+        <ControlButtonArray
+          isPlaying={isPlaying}
+          isPaused={isPaused}
+          onPlayPause={() => handleButtonClick('play-pause', togglePlayPause)}
+          onStop={() => handleButtonClick('stop', stop)}
+          onPreviousTrack={() => handleButtonClick('previous', previousTrack)}
+          onNextTrack={() => handleButtonClick('next', nextTrack)}
+          onVolumeUp={() => handleButtonClick('volume-up', increaseVolume)}
+          onVolumeDown={() => handleButtonClick('volume-down', decreaseVolume)}
+          onPreviousPlaylist={() => handleButtonClick('playlist-previous', previousPlaylist)}
+          onNextPlaylist={() => handleButtonClick('playlist-next', nextPlaylist)}
+          onTogglePlaylist={() => setPanelVisible(!panelVisible)}
+          isPlaylistVisible={panelVisible}
+        />
+        <PlaylistPanel
+          currentPlaylistName={currentPlaylistName}
+          currentPlaylistTracks={currentPlaylistTracks}
+          currentTrackIndex={currentTrackIndex}
+          onTrackSelect={async (index) => {
+            selectTrack(index);
+            // Auto-play the selected track
+            await play();
+          }}
+          isVisible={panelVisible}
+        />
       </div>
     </div>
   );

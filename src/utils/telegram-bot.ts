@@ -57,7 +57,7 @@ export async function sendMessage(
     body: JSON.stringify({
       chat_id: chatId,
       text,
-      parse_mode: 'HTML',
+      parse_mode: 'Markdown',
       reply_markup: replyMarkup,
     }),
   });
@@ -116,7 +116,7 @@ export async function editMessageText(
       chat_id: chatId,
       message_id: messageId,
       text,
-      parse_mode: 'HTML',
+      parse_mode: 'Markdown',
       reply_markup: replyMarkup,
     }),
   });
@@ -124,6 +124,38 @@ export async function editMessageText(
   if (!response.ok) {
     const error = await response.text();
     throw new Error(`Telegram API error: ${error}`);
+  }
+}
+
+/**
+ * Delete a message
+ */
+export async function deleteMessage(
+  botToken: string,
+  chatId: number,
+  messageId: number
+): Promise<void> {
+  const url = `${TELEGRAM_API_URL}${botToken}/deleteMessage`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+    }),
+  });
+
+  if (!response.ok) {
+    // Don't throw error if message is already deleted or doesn't exist
+    const error = await response.text();
+    const errorData = JSON.parse(error);
+    // Error code 400 means message not found or already deleted - that's okay
+    if (errorData.error_code !== 400) {
+      throw new Error(`Telegram API error: ${error}`);
+    }
   }
 }
 
@@ -153,7 +185,7 @@ export async function sendPhoto(
         chat_id: chatId,
         photo,
         caption,
-        parse_mode: 'HTML',
+        parse_mode: 'Markdown',
         reply_markup: replyMarkup,
       }),
     });
@@ -258,5 +290,134 @@ export function isValidSpotifyUrl(url: string): boolean {
  */
 export function isValidSongUrl(url: string): boolean {
   return isValidYouTubeUrl(url) || isValidSpotifyUrl(url);
+}
+
+/**
+ * Check if a user is an admin
+ * Works in both Astro (import.meta.env) and Node.js (process.env) contexts
+ */
+export function isAdmin(userId: number): boolean {
+  let adminIdsEnv: string | undefined;
+  
+  // Check process.env first (Node.js context)
+  if (typeof process !== 'undefined' && process.env) {
+    adminIdsEnv = process.env.TELEGRAM_ADMIN_IDS;
+  }
+  
+  // Fallback to import.meta.env (Astro context) if process.env didn't have it
+  if (!adminIdsEnv) {
+    try {
+      // Check if import.meta is available (Astro/Vite context)
+      if (typeof import.meta !== 'undefined' && import.meta.env) {
+        adminIdsEnv = import.meta.env.TELEGRAM_ADMIN_IDS;
+      }
+    } catch {
+      // import.meta not available, that's okay
+    }
+  }
+  
+  if (!adminIdsEnv) {
+    return false;
+  }
+  
+  const adminIds = adminIdsEnv
+    .split(',')
+    .map(id => id.trim())
+    .filter(id => id.length > 0)
+    .map(id => parseInt(id, 10))
+    .filter(id => !isNaN(id));
+  
+  return adminIds.includes(userId);
+}
+
+/**
+ * Fetch playlists from the API or local file
+ * Falls back to reading local file if API is not available
+ */
+export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
+  // Try to get baseUrl from various sources
+  let baseUrl: string | undefined;
+  
+  // Check process.env first (Node.js context)
+  if (typeof process !== 'undefined' && process.env) {
+    baseUrl = siteUrl || process.env.PUBLIC_SITE_URL;
+  }
+  
+  // Fallback to import.meta.env (Astro context)
+  if (!baseUrl) {
+    try {
+      if (typeof import.meta !== 'undefined' && import.meta.env) {
+        baseUrl = siteUrl || import.meta.env.PUBLIC_SITE_URL;
+      }
+    } catch {
+      // import.meta not available
+    }
+  }
+  
+  // Default fallback
+  if (!baseUrl) {
+    baseUrl = siteUrl || 'http://localhost:4321';
+  }
+  
+  const url = `${baseUrl}/api/playlists.json`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch playlists: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.playlists || [];
+  } catch (error) {
+    // If API fetch fails, silently try reading from local file (expected in local dev)
+    try {
+      // Check if we're in Node.js context and can read files
+      if (typeof process !== 'undefined' && process.env) {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        
+        // Try to find the playlists.json file
+        let playlistsPath: string;
+        try {
+          // If running from scripts directory
+          playlistsPath = path.join(process.cwd(), 'src', 'config', 'playlists.json');
+          const data = await fs.readFile(playlistsPath, 'utf-8');
+          const parsed = JSON.parse(data);
+          return parsed.playlists || [];
+        } catch {
+          // Try public directory as fallback
+          playlistsPath = path.join(process.cwd(), 'public', 'playlists.json');
+          const data = await fs.readFile(playlistsPath, 'utf-8');
+          const parsed = JSON.parse(data);
+          return parsed.playlists || [];
+        }
+      }
+    } catch (fileError) {
+      // Only log if local file read also failed (actual error)
+      console.error('Error reading local playlists file:', fileError);
+    }
+    
+    // Only log as error if we're in a context where local file fallback isn't available
+    if (typeof process === 'undefined' || !process.env) {
+      console.error('Error fetching playlists (no local file fallback available):', error);
+    }
+    return [];
+  }
+}
+
+/**
+ * Validate playlist name to prevent path traversal
+ */
+export function validatePlaylistName(name: string): boolean {
+  // Prevent path traversal and invalid characters
+  if (!name || name.length === 0 || name.length > 100) {
+    return false;
+  }
+  // Check for path traversal attempts
+  if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+    return false;
+  }
+  // Allow alphanumeric, spaces, hyphens, underscores
+  return /^[a-zA-Z0-9\s_-]+$/.test(name);
 }
 

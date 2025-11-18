@@ -166,6 +166,117 @@ function sanitizeFileName(fileName: string): string {
 }
 
 /**
+ * Delete a file from Dreamhost via FTP or SFTP
+ */
+export async function deleteFromDreamhost(
+  fileName: string,
+  options: UploadOptions
+): Promise<void> {
+  const remoteFilePath = `${options.remotePath}/${fileName}`;
+  
+  if (options.useSFTP) {
+    await deleteViaSFTP(remoteFilePath, options);
+  } else {
+    // Try FTP first, fallback to SFTP on login error
+    try {
+      await deleteViaFTP(remoteFilePath, options);
+    } catch (error: any) {
+      // If FTP login fails, try SFTP as fallback
+      if (error.message.includes('530') || error.message.includes('Login incorrect')) {
+        console.log(`[${new Date().toISOString()}] FTP login failed, trying SFTP...`);
+        await deleteViaSFTP(remoteFilePath, options);
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
+/**
+ * Delete file via FTP
+ */
+async function deleteViaFTP(
+  remoteFilePath: string,
+  options: UploadOptions
+): Promise<void> {
+  const client = new Client();
+  client.ftp.verbose = false;
+
+  try {
+    console.log(`[${new Date().toISOString()}] Connecting to FTP: ${options.host} as ${options.user}`);
+    
+    await client.access({
+      host: options.host,
+      user: options.user,
+      password: options.password,
+      secure: false,
+      timeout: 30000,
+    });
+
+    console.log(`[${new Date().toISOString()}] FTP connected successfully`);
+    console.log(`[${new Date().toISOString()}] Deleting file: ${remoteFilePath}`);
+    
+    await client.remove(remoteFilePath);
+
+    console.log(`[${new Date().toISOString()}] FTP delete complete`);
+  } catch (error: any) {
+    if (error.message.includes('timeout')) {
+      throw new Error('FTP connection timed out. Please try again.');
+    }
+    if (error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
+      throw new Error('Could not connect to FTP server. Please check server configuration.');
+    }
+    if (error.message.includes('550') || error.message.includes('not found')) {
+      throw new Error('File not found on server.');
+    }
+    throw error;
+  } finally {
+    client.close();
+  }
+}
+
+/**
+ * Delete file via SFTP
+ */
+async function deleteViaSFTP(
+  remoteFilePath: string,
+  options: UploadOptions
+): Promise<void> {
+  const client = new SftpClient();
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Connecting to SFTP: ${options.host} as ${options.user}`);
+    
+    await client.connect({
+      host: options.host,
+      username: options.user,
+      password: options.password,
+      port: 22,
+    });
+
+    console.log(`[${new Date().toISOString()}] SFTP connected successfully`);
+    console.log(`[${new Date().toISOString()}] Deleting file: ${remoteFilePath}`);
+    
+    await client.delete(remoteFilePath);
+
+    console.log(`[${new Date().toISOString()}] SFTP delete complete`);
+  } catch (error: any) {
+    if (error.message.includes('timeout')) {
+      throw new Error('SFTP connection timed out. Please try again.');
+    }
+    if (error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
+      throw new Error('Could not connect to SFTP server. Please check server configuration.');
+    }
+    if (error.message.includes('No such file') || error.message.includes('not found')) {
+      throw new Error('File not found on server.');
+    }
+    throw new Error(`SFTP delete failed: ${error.message}`);
+  } finally {
+    await client.end();
+  }
+}
+
+/**
  * Test FTP connection
  */
 export async function testFTPConnection(options: UploadOptions): Promise<boolean> {

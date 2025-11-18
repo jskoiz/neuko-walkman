@@ -399,6 +399,16 @@ export function useAudioPlayer(tracks: Track[]) {
     }
   }, [isPlaying, isPaused, play, pause]);
 
+  const selectTrack = useCallback((index: number) => {
+    const playlistTracks = getCurrentPlaylistTracks();
+    if (index >= 0 && index < playlistTracks.length) {
+      const wasPlaying = isPlaying && !isPaused;
+      wasPlayingRef.current = wasPlaying;
+      setCurrentTrackIndex(index);
+      setCurrentTime(0);
+    }
+  }, [isPlaying, isPaused, getCurrentPlaylistTracks]);
+
   return {
     currentTrack: currentTrack || null,
     currentTrackIndex,
@@ -419,8 +429,10 @@ export function useAudioPlayer(tracks: Track[]) {
     increaseVolume,
     decreaseVolume,
     togglePlayPause,
+    selectTrack,
     formattedCurrentTime: formatTime(currentTime),
     formattedDuration: duration > 0 ? formatTime(duration) : (currentTrack?.duration || '00:00'),
     totalTracks: currentPlaylistTracks.length,
+    currentPlaylistTracks,
   };
 }

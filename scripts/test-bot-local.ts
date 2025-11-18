@@ -8,11 +8,16 @@ import {
   sendMessage,
   sendPhoto,
   answerCallbackQuery,
+  editMessageText,
+  deleteMessage,
   createInlineKeyboard,
   isValidSongUrl,
+  isAdmin,
+  fetchPlaylists,
+  validatePlaylistName,
 } from '../src/utils/telegram-bot';
 import { downloadSongAsBuffer } from '../src/utils/download-song';
-import { uploadToDreamhost } from '../src/utils/upload-to-dreamhost';
+import { uploadToDreamhost, deleteFromDreamhost } from '../src/utils/upload-to-dreamhost';
 import { checkRateLimit, getResetTime } from '../src/utils/rate-limiter';
 import dotenv from 'dotenv';
 import { readFile } from 'fs/promises';
@@ -26,8 +31,15 @@ const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
 const RATE_LIMIT_REQUESTS = 5;
 const RATE_LIMIT_WINDOW = 60 * 1000;
 
+// User session state interface
+interface UserSession {
+  type: 'waiting_for_url' | 'selecting_playlist_for_add' | 'selecting_playlist_for_delete' | 'selecting_song_to_delete';
+  playlistName?: string;
+  messageId?: number;
+}
+
 // User session state
-const userSessions = new Map<number, 'waiting_for_url'>();
+const userSessions = new Map<number, UserSession>();
 let lastUpdateId = 0;
 
 /**
@@ -35,14 +47,29 @@ let lastUpdateId = 0;
  */
 async function checkWebhook(): Promise<{ url?: string; pending_update_count?: number } | null> {
   try {
-    const response = await fetch(`${TELEGRAM_API_URL}${botToken}/getWebhookInfo`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const response = await fetch(`${TELEGRAM_API_URL}${botToken}/getWebhookInfo`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    
     const data = await response.json();
     if (data.ok && data.result.url && data.result.url !== '') {
       return data.result;
     }
     return null;
-  } catch (error) {
-    console.error('Error checking webhook:', error);
+  } catch (error: any) {
+    // Only log non-network errors or provide a brief message for network issues
+    if (error.name === 'AbortError') {
+      console.log('[bot] Webhook check timed out (assuming no webhook)');
+    } else if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.message?.includes('fetch failed')) {
+      // Transient network errors - silently assume no webhook
+      return null;
+    } else {
+      console.error('[bot] Error checking webhook:', error.message || error);
+    }
     return null;
   }
 }
@@ -68,13 +95,23 @@ async function verifyWebhookDeleted(maxAttempts: number = 5): Promise<boolean> {
  */
 async function deleteWebhook(): Promise<boolean> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     const response = await fetch(`${TELEGRAM_API_URL}${botToken}/deleteWebhook`, {
       method: 'POST',
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
+    
     const data = await response.json();
     return data.ok === true;
-  } catch (error) {
-    console.error('Error deleting webhook:', error);
+  } catch (error: any) {
+    if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.message?.includes('fetch failed')) {
+      // Transient network error - assume deletion failed
+      return false;
+    }
+    console.error('[bot] Error deleting webhook:', error.message || error);
     return false;
   }
 }
@@ -86,7 +123,14 @@ async function getUpdates(): Promise<any[]> {
   const url = `${TELEGRAM_API_URL}${botToken}/getUpdates?offset=${lastUpdateId + 1}&timeout=10`;
   
   try {
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout (long polling)
+    
+    const response = await fetch(url, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    
     if (!response.ok) {
       const errorText = await response.text();
       if (response.status === 409 || errorText.includes('Conflict')) {
@@ -105,8 +149,16 @@ async function getUpdates(): Promise<any[]> {
     if (error.message && error.message.includes('CONFLICT')) {
       throw error;
     }
+    // Handle network errors gracefully
+    if (error.name === 'AbortError') {
+      // Timeout is expected for long polling - return empty array
+      return [];
+    } else if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.message?.includes('fetch failed')) {
+      // Transient network errors - return empty array and retry
+      return [];
+    }
     // For other errors, log and return empty array
-    console.error('Error fetching updates:', error.message || error);
+    console.error('[bot] Error fetching updates:', error.message || error);
     return [];
   }
 }
@@ -114,7 +166,7 @@ async function getUpdates(): Promise<any[]> {
 /**
  * Process song download and upload
  */
-async function processSongSubmission(chatId: number, url: string): Promise<void> {
+async function processSongSubmission(chatId: number, url: string, playlistName?: string): Promise<void> {
   try {
     console.log(`[${new Date().toISOString()}] Starting song submission for chat ${chatId}, URL: ${url}`);
     
@@ -158,11 +210,21 @@ async function processSongSubmission(chatId: number, url: string): Promise<void>
 
     console.log(`[${new Date().toISOString()}] Download complete: ${fileName} (${Math.round(buffer.length / 1024 / 1024)}MB)`);
 
+    // Validate playlist name if provided
+    if (playlistName && !validatePlaylistName(playlistName)) {
+      throw new Error('Invalid playlist name');
+    }
+
     // Upload to Dreamhost
     const ftpHost = process.env.DREAMHOST_FTP_HOST || 'files.bloc.rocks';
     const ftpUser = process.env.DREAMHOST_FTP_USER;
     const ftpPassword = process.env.DREAMHOST_FTP_PASSWORD;
-    const ftpPath = process.env.DREAMHOST_FTP_PATH || '/public/music/community';
+    const basePath = process.env.DREAMHOST_FTP_PATH?.replace(/\/[^/]+$/, '') || '/public/music';
+    const useSFTP = process.env.DREAMHOST_USE_SFTP === 'true';
+    
+    // Use provided playlist name or default to 'community'
+    const targetPlaylist = playlistName || 'community';
+    const ftpPath = `${basePath}/${targetPlaylist}`;
 
     if (!ftpUser || !ftpPassword) {
       throw new Error('FTP credentials not configured');
@@ -172,9 +234,6 @@ async function processSongSubmission(chatId: number, url: string): Promise<void>
     console.log(`[${new Date().toISOString()}] FTP Host: ${ftpHost}`);
     console.log(`[${new Date().toISOString()}] FTP User: ${ftpUser ? 'Set' : 'NOT SET'}`);
     console.log(`[${new Date().toISOString()}] FTP Path: ${ftpPath}`);
-    
-    // Check if SFTP should be used (Dreamhost often uses SFTP)
-    const useSFTP = process.env.DREAMHOST_USE_SFTP === 'true';
     
     await uploadToDreamhost(buffer, fileName, {
       host: ftpHost,
@@ -224,10 +283,11 @@ async function processSongSubmission(chatId: number, url: string): Promise<void>
 
     // Send success message
     console.log(`[${new Date().toISOString()}] Sending success message to chat ${chatId}`);
+    const playlistDisplay = playlistName || 'community';
     await sendMessage(
       botToken,
       chatId,
-      `✅ Success! Your song "${title || fileName}" has been added to the community playlist.\n\nIt will be available on the site shortly.`
+      `✅ Success! Your song "${title || fileName}" has been added to the "${playlistDisplay}" playlist.\n\nIt will be available on the site shortly.`
     );
 
     // Clear session
@@ -259,38 +319,237 @@ async function processSongSubmission(chatId: number, url: string): Promise<void>
 }
 
 /**
+ * Show restricted access menu (admin only)
+ */
+async function showRestrictedAccess(chatId: number, messageId?: number): Promise<void> {
+  // Delete previous message if provided
+  if (messageId) {
+    try {
+      await deleteMessage(botToken, chatId, messageId);
+    } catch (error) {
+      // Ignore errors
+    }
+  }
+
+  const buttons: Array<Array<{ text: string; callback_data: string }>> = [
+    [{ text: '➕ Add Song to Any Playlist', callback_data: 'add_song_admin' }],
+    [{ text: '🗑️ Delete Song', callback_data: 'delete_song_menu' }],
+    [{ text: '⬅️ Back to Main Menu', callback_data: 'back_to_main' }],
+  ];
+
+  const keyboard = createInlineKeyboard(buttons);
+  const text = '🔒 **Restricted Access**\n\nAdmin-only features:';
+
+  await sendMessage(botToken, chatId, text, keyboard);
+}
+
+/**
+ * Show list of playlists
+ */
+async function showPlaylists(chatId: number, messageId?: number, isAdminUser: boolean = false, deletePrevious: boolean = true): Promise<void> {
+  try {
+    // Delete previous message if requested
+    if (deletePrevious && messageId) {
+      try {
+        await deleteMessage(botToken, chatId, messageId);
+      } catch (error) {
+        // Ignore errors - message might already be deleted or not exist
+      }
+    }
+
+    const siteUrl = process.env.PUBLIC_SITE_URL || 'http://localhost:4321';
+    const playlists = await fetchPlaylists(siteUrl);
+    
+    if (playlists.length === 0) {
+      await sendMessage(botToken, chatId, '📋 No playlists found.');
+      return;
+    }
+
+    const buttons: Array<Array<{ text: string; callback_data: string }>> = [];
+    const maxButtons = Math.min(playlists.length, 50);
+    for (let i = 0; i < maxButtons; i++) {
+      const playlist = playlists[i];
+      const trackCount = playlist.tracks?.length || 0;
+      // Encode playlist name to handle spaces and special characters
+      const encodedPlaylistName = encodeURIComponent(playlist.name);
+      buttons.push([{
+        text: `📁 ${playlist.name} (${trackCount} tracks)`,
+        callback_data: `playlist_${encodedPlaylistName}`
+      }]);
+    }
+
+    buttons.push([{ text: '🏠 Back to Main Menu', callback_data: 'back_to_main' }]);
+    const keyboard = createInlineKeyboard(buttons);
+    const text = '📋 Select a playlist to view songs:';
+
+    await sendMessage(botToken, chatId, text, keyboard);
+  } catch (error: any) {
+    console.error('Error showing playlists:', error);
+    await sendMessage(botToken, chatId, '❌ Error loading playlists. Please try again later.');
+  }
+}
+
+/**
+ * Show songs in a playlist
+ */
+async function showPlaylistSongs(chatId: number, playlistName: string, messageId?: number, isAdminUser: boolean = false, deletePrevious: boolean = true): Promise<void> {
+  try {
+    // Delete previous message if requested
+    if (deletePrevious && messageId) {
+      try {
+        await deleteMessage(botToken, chatId, messageId);
+      } catch (error) {
+        // Ignore errors - message might already be deleted or not exist
+      }
+    }
+
+    if (!validatePlaylistName(playlistName)) {
+      await sendMessage(botToken, chatId, '❌ Invalid playlist name.');
+      return;
+    }
+
+    const siteUrl = process.env.PUBLIC_SITE_URL || 'http://localhost:4321';
+    const playlists = await fetchPlaylists(siteUrl);
+    const playlist = playlists.find(p => p.name === playlistName);
+
+    if (!playlist || !playlist.tracks || playlist.tracks.length === 0) {
+      await sendMessage(botToken, chatId, `📁 Playlist "${playlistName}" is empty.`);
+      return;
+    }
+
+    const tracks = playlist.tracks;
+    const buttons: Array<Array<{ text: string; callback_data: string }>> = [];
+    const maxButtons = Math.min(tracks.length, 50);
+    for (let i = 0; i < maxButtons; i++) {
+      const track = tracks[i];
+      const displayName = track.trackName.length > 30 
+        ? track.trackName.substring(0, 27) + '...' 
+        : track.trackName;
+      
+      // Use track index instead of filename to avoid exceeding Telegram's 64-byte callback_data limit
+      // Encode playlist name to handle spaces and special characters
+      const encodedPlaylistName = encodeURIComponent(playlistName);
+      if (isAdminUser) {
+        buttons.push([{
+          text: `🗑️ ${displayName}`,
+          callback_data: `delete_song_${encodedPlaylistName}_${i}`
+        }]);
+      } else {
+        buttons.push([{
+          text: `🎵 ${displayName}`,
+          callback_data: `view_song_${encodedPlaylistName}_${i}`
+        }]);
+      }
+    }
+
+    buttons.push([{ text: '⬅️ Back to Playlists', callback_data: 'back_to_playlists' }]);
+    const keyboard = createInlineKeyboard(buttons);
+    const text = `📁 **${playlistName}**\n\n🎵 ${tracks.length} track${tracks.length !== 1 ? 's' : ''}\n\n${isAdminUser ? 'Tap a song to delete it.' : 'Tap a song to view details.'}`;
+
+    await sendMessage(botToken, chatId, text, keyboard);
+  } catch (error: any) {
+    console.error('Error showing playlist songs:', error);
+    await sendMessage(botToken, chatId, '❌ Error loading playlist songs. Please try again later.');
+  }
+}
+
+/**
+ * Delete a song from a playlist
+ */
+async function deleteSong(chatId: number, playlistName: string, fileName: string): Promise<void> {
+  try {
+    if (!validatePlaylistName(playlistName)) {
+      await sendMessage(botToken, chatId, '❌ Invalid playlist name.');
+      return;
+    }
+
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    await sendMessage(botToken, chatId, '🗑️ Deleting song...');
+
+    const ftpHost = process.env.DREAMHOST_FTP_HOST || 'files.bloc.rocks';
+    const ftpUser = process.env.DREAMHOST_FTP_USER;
+    const ftpPassword = process.env.DREAMHOST_FTP_PASSWORD;
+    const basePath = process.env.DREAMHOST_FTP_PATH?.replace(/\/[^/]+$/, '') || '/public/music';
+    const useSFTP = process.env.DREAMHOST_USE_SFTP === 'true';
+    const ftpPath = `${basePath}/${playlistName}`;
+
+    if (!ftpUser || !ftpPassword) {
+      throw new Error('FTP credentials not configured');
+    }
+
+    await deleteFromDreamhost(sanitizedFileName, {
+      host: ftpHost,
+      user: ftpUser,
+      password: ftpPassword,
+      remotePath: ftpPath,
+      useSFTP: useSFTP,
+    });
+
+    const siteUrl = process.env.PUBLIC_SITE_URL || 'http://localhost:4321';
+    try {
+      await fetch(`${siteUrl}/api/update-playlists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      console.error('Failed to update playlists:', error);
+    }
+
+    await sendMessage(botToken, chatId, `✅ Song deleted from "${playlistName}" playlist.`);
+    userSessions.delete(chatId);
+  } catch (error: any) {
+    console.error('Error deleting song:', error);
+    let errorMessage = error.message || 'An unknown error occurred';
+    if (errorMessage.includes('not found')) {
+      errorMessage = 'Song not found on server.';
+    } else if (errorMessage.includes('FTP') || errorMessage.includes('SFTP')) {
+      errorMessage = 'Failed to delete the song. Please contact support if this persists.';
+    }
+    await sendMessage(botToken, chatId, `❌ Error: ${errorMessage}`);
+    userSessions.delete(chatId);
+  }
+}
+
+/**
  * Handle /start command
  */
-async function handleStartCommand(chatId: number, username?: string): Promise<void> {
-  const keyboard = createInlineKeyboard([
-    [{ text: '➕ Add New Song', callback_data: 'add_song' }],
-  ]);
-
-  // Get username or use "Operative" as fallback
-  const displayName = username ? `@${username}` : 'Operative';
+async function handleStartCommand(chatId: number, username?: string, userId?: number, messageId?: number): Promise<void> {
+  const isAdminUser = userId ? isAdmin(userId) : false;
   
+  const buttons: Array<Array<{ text: string; callback_data: string }>> = [
+    [{ text: '➕ Add Song to Community', callback_data: 'add_song' }],
+    [{ text: '📋 View Playlists', callback_data: 'view_playlists' }],
+  ];
+
+  // Add restricted access option (admin only)
+  if (isAdminUser) {
+    buttons.push([{ text: '🔒 Restricted Access', callback_data: 'restricted_access' }]);
+  }
+
+  const keyboard = createInlineKeyboard(buttons);
+  const displayName = username ? `@${username}` : 'Operative';
   const welcomeText = `Greetings Operative ${displayName}\n\n` +
     `Share your favorite songs with the community.\n\n` +
-    `Click the button below to add a song:\n\n` +
-    `You can listen to all the Neuko sounds <a href="https://bloc.rocks">here</a>`;
+    `You can listen to all the Neuko sounds at https://bloc.rocks`;
 
-  // For local testing, read the file from disk and send as Buffer
-  // For production, use a public URL
-  let photo: string | Buffer | null = null;
-  
-  // For local testing script, ALWAYS read file from disk as Buffer
-  // Telegram can't access localhost URLs, so we must send the file directly
-  // This is a local testing script, so we always use Buffer regardless of env vars
+  // Delete previous message if provided (for navigation)
+  if (messageId) {
+    try {
+      await deleteMessage(botToken, chatId, messageId);
+    } catch (error) {
+      // Ignore errors - might be a photo message which can't be deleted
+    }
+  }
+
   const photoPath = join(process.cwd(), 'public', 'vending-machines.jpg');
+  let photo: string | Buffer | null = null;
   try {
     photo = await readFile(photoPath);
   } catch (error) {
     console.error('Failed to read photo file:', error);
-    // For local testing, if file doesn't exist, send message without photo
     photo = null;
   }
 
-  // Send photo if available, otherwise just send the message
   if (photo) {
     await sendPhoto(botToken, chatId, photo, welcomeText, keyboard);
   } else {
@@ -303,19 +562,175 @@ async function handleStartCommand(chatId: number, username?: string): Promise<vo
  */
 async function handleCallbackQuery(callbackQuery: any): Promise<void> {
   const chatId = callbackQuery.message?.chat?.id;
+  const messageId = callbackQuery.message?.message_id;
   const data = callbackQuery.data;
+  const userId = callbackQuery.from?.id;
 
   if (!chatId) return;
 
   await answerCallbackQuery(botToken, callbackQuery.id);
+  const isAdminUser = userId ? isAdmin(userId) : false;
 
   if (data === 'add_song') {
-    userSessions.set(chatId, 'waiting_for_url');
-    await sendMessage(
-      botToken,
-      chatId,
-      '📎 Please share a YouTube or Spotify link to the song you want to add.'
-    );
+    // Delete previous message
+    if (messageId) {
+      try {
+        await deleteMessage(botToken, chatId, messageId);
+      } catch (error) {
+        // Ignore errors
+      }
+    }
+    userSessions.set(chatId, { type: 'waiting_for_url' });
+    await sendMessage(botToken, chatId, '📎 Please share a YouTube or Spotify link to the song you want to add to the community playlist.');
+    return;
+  }
+
+  if (data === 'view_playlists') {
+    await showPlaylists(chatId, messageId, isAdminUser, true);
+    return;
+  }
+
+  if (data === 'back_to_main') {
+    const username = callbackQuery.from?.username;
+    await handleStartCommand(chatId, username, userId, messageId);
+    return;
+  }
+
+  if (data === 'back_to_playlists') {
+    await showPlaylists(chatId, messageId, isAdminUser, true);
+    return;
+  }
+
+  // Restricted access menu
+  if (data === 'restricted_access') {
+    if (!isAdminUser) {
+      await sendMessage(botToken, chatId, '❌ You do not have permission to access this area.');
+      return;
+    }
+    await showRestrictedAccess(chatId, messageId);
+    return;
+  }
+
+  if (data === 'add_song_admin') {
+    if (!isAdminUser) {
+      await sendMessage(botToken, chatId, '❌ You do not have permission to perform this action.');
+      return;
+    }
+    await showPlaylists(chatId, messageId, isAdminUser, true);
+    userSessions.set(chatId, { type: 'selecting_playlist_for_add', messageId });
+    return;
+  }
+
+  if (data === 'delete_song_menu') {
+    if (!isAdminUser) {
+      await sendMessage(botToken, chatId, '❌ You do not have permission to perform this action.');
+      return;
+    }
+    await showPlaylists(chatId, messageId, isAdminUser, true);
+    userSessions.set(chatId, { type: 'selecting_playlist_for_delete', messageId });
+    return;
+  }
+
+  if (data.startsWith('playlist_')) {
+    const encodedName = data.replace('playlist_', '');
+    const playlistName = decodeURIComponent(encodedName);
+    if (!validatePlaylistName(playlistName)) {
+      await sendMessage(botToken, chatId, '❌ Invalid playlist name.');
+      return;
+    }
+    
+    const session = userSessions.get(chatId);
+    if (session?.type === 'selecting_playlist_for_add') {
+      // Delete previous message
+      if (messageId) {
+        try {
+          await deleteMessage(botToken, chatId, messageId);
+        } catch (error) {
+          // Ignore errors
+        }
+      }
+      userSessions.set(chatId, { type: 'waiting_for_url', playlistName });
+      await sendMessage(botToken, chatId, `📎 Please share a YouTube or Spotify link to add to the "${playlistName}" playlist.`);
+      return;
+    }
+    
+    if (session?.type === 'selecting_playlist_for_delete') {
+      await showPlaylistSongs(chatId, playlistName, messageId, isAdminUser, true);
+      userSessions.set(chatId, { type: 'selecting_song_to_delete', playlistName, messageId });
+      return;
+    }
+    
+    await showPlaylistSongs(chatId, playlistName, messageId, isAdminUser, true);
+    return;
+  }
+
+  if (data.startsWith('delete_song_')) {
+    if (!isAdminUser) {
+      await sendMessage(botToken, chatId, '❌ You do not have permission to perform this action.');
+      return;
+    }
+    // Format: delete_song_<encodedPlaylistName>_<trackIndex>
+    const payload = data.replace('delete_song_', '');
+    const lastUnderscoreIndex = payload.lastIndexOf('_');
+    if (lastUnderscoreIndex === -1) {
+      await sendMessage(botToken, chatId, '❌ Invalid delete request.');
+      return;
+    }
+    
+    const trackIndex = parseInt(payload.substring(lastUnderscoreIndex + 1), 10);
+    const encodedPlaylistName = payload.substring(0, lastUnderscoreIndex);
+    const playlistName = decodeURIComponent(encodedPlaylistName);
+    
+    if (!validatePlaylistName(playlistName) || isNaN(trackIndex)) {
+      await sendMessage(botToken, chatId, '❌ Invalid delete request.');
+      return;
+    }
+    
+    // Fetch playlist to get track info
+    try {
+      const siteUrl = process.env.PUBLIC_SITE_URL || 'http://localhost:4321';
+      const playlists = await fetchPlaylists(siteUrl);
+      const playlist = playlists.find(p => p.name === playlistName);
+      
+      if (!playlist || !playlist.tracks || !playlist.tracks[trackIndex]) {
+        await sendMessage(botToken, chatId, '❌ Song not found.');
+        return;
+      }
+      
+      const track = playlist.tracks[trackIndex];
+      const fileName = track.fileName.split('/').pop() || '';
+      await deleteSong(chatId, playlistName, fileName);
+    } catch (error) {
+      console.error('Error getting track info:', error);
+      await sendMessage(botToken, chatId, '❌ Error deleting song.');
+    }
+    return;
+  }
+
+  if (data.startsWith('view_song_')) {
+    const payload = data.replace('view_song_', '');
+    const lastUnderscoreIndex = payload.lastIndexOf('_');
+    if (lastUnderscoreIndex === -1) return;
+    
+    const songIndex = parseInt(payload.substring(lastUnderscoreIndex + 1), 10);
+    const encodedPlaylistName = payload.substring(0, lastUnderscoreIndex);
+    const playlistName = decodeURIComponent(encodedPlaylistName);
+    if (!validatePlaylistName(playlistName)) {
+      await sendMessage(botToken, chatId, '❌ Invalid playlist name.');
+      return;
+    }
+    try {
+      const siteUrl = process.env.PUBLIC_SITE_URL || 'http://localhost:4321';
+      const playlists = await fetchPlaylists(siteUrl);
+      const playlist = playlists.find(p => p.name === playlistName);
+      if (playlist && playlist.tracks && playlist.tracks[songIndex]) {
+        const track = playlist.tracks[songIndex];
+        await sendMessage(botToken, chatId, `🎵 **${track.trackName}**\n\n📁 Playlist: ${playlistName}\n🎵 Track #${track.trackNumber}`);
+      }
+    } catch (error) {
+      console.error('Error viewing song:', error);
+    }
+    return;
   }
 }
 
@@ -325,68 +740,55 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
 async function handleMessage(message: any): Promise<void> {
   const chatId = message.chat.id;
   const text = message.text?.trim();
+  const userId = message.from?.id;
 
   if (!text) return;
 
-  // Check rate limit
-  const userId = chatId.toString();
-  if (!checkRateLimit(userId, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW)) {
-    const resetTime = getResetTime(userId);
+  const userIdStr = chatId.toString();
+  if (!checkRateLimit(userIdStr, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW)) {
+    const resetTime = getResetTime(userIdStr);
     const waitSeconds = resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : 60;
-    await sendMessage(
-      botToken,
-      chatId,
-      `⏳ Rate limit exceeded. Please wait ${waitSeconds} seconds before trying again.`
-    );
+    await sendMessage(botToken, chatId, `⏳ Rate limit exceeded. Please wait ${waitSeconds} seconds before trying again.`);
     return;
   }
 
-  // Check if user is waiting for URL
-  if (userSessions.get(chatId) === 'waiting_for_url') {
+  const session = userSessions.get(chatId);
+  if (session && session.type === 'waiting_for_url') {
     if (isValidSongUrl(text)) {
       try {
         new URL(text);
       } catch {
-        await sendMessage(
-          botToken,
-          chatId,
-          '❌ Invalid URL format. Please share a valid YouTube or Spotify link.'
-        );
+        await sendMessage(botToken, chatId, '❌ Invalid URL format. Please share a valid YouTube or Spotify link.');
         return;
       }
-      
-      // Process the song asynchronously
-      processSongSubmission(chatId, text).catch((error) => {
+      const playlistName = session.playlistName;
+      processSongSubmission(chatId, text, playlistName).catch((error) => {
         console.error('Background processing error:', error);
       });
     } else {
-      await sendMessage(
-        botToken,
-        chatId,
-        '❌ Invalid URL. Please share a valid YouTube or Spotify link.\n\n' +
+      await sendMessage(botToken, chatId, '❌ Invalid URL. Please share a valid YouTube or Spotify link.\n\n' +
         'Examples:\n' +
         '• https://www.youtube.com/watch?v=...\n' +
         '• https://youtu.be/...\n' +
         '• https://open.spotify.com/track/...\n' +
-        '• https://open.spotify.com/album/...'
-      );
+        '• https://open.spotify.com/album/...');
     }
     return;
   }
 
-  // Handle /start command
   if (text.startsWith('/start')) {
     const username = message.from?.username;
-    await handleStartCommand(chatId, username);
+    await handleStartCommand(chatId, username, userId);
     return;
   }
 
-  // Default response
-  await sendMessage(
-    botToken,
-    chatId,
-    '👋 Use /start to begin adding songs to the community playlist!'
-  );
+  if (text.startsWith('/playlists')) {
+    const isAdminUser = userId ? isAdmin(userId) : false;
+    await showPlaylists(chatId, undefined, isAdminUser, false);
+    return;
+  }
+
+  await sendMessage(botToken, chatId, '👋 Use /start to see available options!');
 }
 
 /**

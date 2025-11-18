@@ -30,3 +30,5 @@ curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo" | pyt
 echo ""
 echo "💡 You can now run the bot locally with: npm run bot:local"
 
+
+
