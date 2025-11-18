@@ -26,16 +26,6 @@
       "tracks": [
         {
           "trackNumber": 1,
-          "trackName": "Fantasy",
-          "fileName": "/music/community/Fantasy.mp3",
-          "duration": "0:00",
-          "playlistName": "community",
-          "playlistIndex": 2,
-          "playlistTotal": 6,
-          "playlistPath": "/music/community"
-        },
-        {
-          "trackNumber": 2,
           "trackName": "Jamie_s_Elsewhere_-_Traveler_OFFICIAL_MUSIC_VIDEO_",
           "fileName": "/music/community/Jamie_s_Elsewhere_-_Traveler_OFFICIAL_MUSIC_VIDEO_.mp3",
           "duration": "0:00",
@@ -45,7 +35,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 3,
+          "trackNumber": 2,
           "trackName": "Massive_Attack_-_Unfinished_Sympathy",
           "fileName": "/music/community/Massive_Attack_-_Unfinished_Sympathy.mp3",
           "duration": "0:00",
@@ -55,7 +45,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 4,
+          "trackNumber": 3,
           "trackName": "Oasis_-_Wonderwall_Official_Video_",
           "fileName": "/music/community/Oasis_-_Wonderwall_Official_Video_.mp3",
           "duration": "0:00",
@@ -65,7 +55,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 5,
+          "trackNumber": 4,
           "trackName": "atarashii_gakko_-_tokyo_calling_official_music_video_",
           "fileName": "/music/community/atarashii_gakko_-_tokyo_calling_official_music_video_.mp3",
           "duration": "0:00",

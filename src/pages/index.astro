@@ -10,15 +10,18 @@ import "../styles/global.css";
 import playlistsData from "../config/playlists.json";
 import Analytics from "@vercel/analytics/astro";
 
-// Try to load playlists dynamically from API, fallback to static file
-let playlists: Playlist[] = playlistsData.playlists || [];
+// Always load playlists dynamically from API (scans FTP in production)
+// Only use static file as absolute last resort
+let playlists: Playlist[] = [];
 
-// In SSR mode, fetch from dynamic API endpoint
+// In SSR mode, fetch from dynamic API endpoint (always scans FTP when credentials are set)
 try {
   // Use Astro.url to get the current request URL
   const baseUrl = Astro.url.origin;
   const apiUrl = `${baseUrl}/api/playlists.json`;
-  const response = await fetch(apiUrl);
+  const response = await fetch(apiUrl, {
+    cache: 'no-store', // Never cache - always get fresh data
+  });
   if (response.ok) {
     const data = await response.json();
     if (data.playlists && data.playlists.length > 0) {
@@ -26,7 +29,13 @@ try {
     }
   }
 } catch (error) {
-  console.log('Failed to load dynamic playlists, using static file:', error);
+  console.log('Failed to load dynamic playlists from API:', error);
+}
+
+// Only use static file if API completely failed and we have no playlists
+if (playlists.length === 0) {
+  console.log('Falling back to static playlists.json file');
+  playlists = playlistsData.playlists || [];
 }
 
 const allTracks: Track[] = playlists.flatMap((playlist) => playlist.tracks);

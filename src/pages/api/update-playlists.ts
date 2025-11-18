@@ -233,7 +233,9 @@ export const GET: APIRoute = async () => {
           status: 200,
           headers: {
             'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=60', // Cache for 1 minute
+            'Cache-Control': 'no-cache, no-store, must-revalidate', // Don't cache - always fetch fresh data
+            'Pragma': 'no-cache',
+            'Expires': '0',
           },
         }
       );
@@ -247,7 +249,9 @@ export const GET: APIRoute = async () => {
           status: 200,
           headers: {
             'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
+            'Cache-Control': 'no-cache, no-store, must-revalidate', // Don't cache - always fetch fresh data
+            'Pragma': 'no-cache',
+            'Expires': '0',
           },
         });
       } catch (error) {
@@ -255,7 +259,10 @@ export const GET: APIRoute = async () => {
           JSON.stringify({ playlists: [], error: 'No playlists available' }),
           {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+            },
           }
         );
       }

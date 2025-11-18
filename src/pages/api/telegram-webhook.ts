@@ -356,15 +356,39 @@ async function deleteSong(
       useSFTP: useSFTP,
     });
 
+    // Also delete local copy if it exists (for local development)
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const localFilePath = path.join(process.cwd(), 'public', 'music', playlistName, sanitizedFileName);
+      try {
+        await fs.unlink(localFilePath);
+        console.log(`Deleted local file: ${localFilePath}`);
+      } catch (localError: any) {
+        // File might not exist locally, which is fine
+        if (localError.code !== 'ENOENT') {
+          console.warn('Failed to delete local file:', localError);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to delete local file:', error);
+    }
+
+    // Wait a moment for FTP server to fully process the deletion
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // Trigger playlist update
     const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'http://localhost:4321';
     try {
-      await fetch(`${siteUrl}/api/update-playlists`, {
+      const updateResponse = await fetch(`${siteUrl}/api/update-playlists`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
       });
+      if (!updateResponse.ok) {
+        console.error('Playlist update returned non-OK status:', updateResponse.status);
+      }
     } catch (error) {
       console.error('Failed to update playlists:', error);
     }
