@@ -66,6 +66,26 @@
         },
         {
           "trackNumber": 5,
+          "trackName": "Vektor_-_Cosmic_Cortex",
+          "fileName": "/music/community/Vektor_-_Cosmic_Cortex.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 6,
+          "trackName": "Vektor_-_Echoless_Chamber",
+          "fileName": "/music/community/Vektor_-_Echoless_Chamber.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 7,
           "trackName": "atarashii_gakko_-_tokyo_calling_official_music_video_",
           "fileName": "/music/community/atarashii_gakko_-_tokyo_calling_official_music_video_.mp3",
           "duration": "0:00",

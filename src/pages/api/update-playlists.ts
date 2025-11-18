@@ -50,8 +50,8 @@ async function scanDreamHostFTP(): Promise<any> {
 
   const playlists: any[] = [];
 
-  if (useSFTP) {
-    // Use SFTP
+  // Helper function to scan using SFTP
+  async function scanWithSFTP(): Promise<any[]> {
     const client = new SftpClient();
     try {
       await client.connect({
@@ -70,7 +70,7 @@ async function scanDreamHostFTP(): Promise<any> {
         const files = await client.list(playlistPath);
         const audioFiles = files.filter((file: any) => {
           const ext = file.name.split('.').pop()?.toLowerCase();
-          return file.type === '-' && ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'].includes(`.${ext}`);
+          return file.type === '-' && ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext);
         });
 
         if (audioFiles.length > 0) {
@@ -97,11 +97,14 @@ async function scanDreamHostFTP(): Promise<any> {
           });
         }
       }
+      return playlists;
     } finally {
       await client.end();
     }
-  } else {
-    // Use FTP
+  }
+
+  // Helper function to scan using FTP
+  async function scanWithFTP(): Promise<any[]> {
     const client = new Client();
     client.ftp.verbose = false;
     try {
@@ -122,7 +125,7 @@ async function scanDreamHostFTP(): Promise<any> {
         const files = await client.list(playlistPath);
         const audioFiles = files.filter((file: any) => {
           const ext = file.name.split('.').pop()?.toLowerCase();
-          return !file.isDirectory && ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'].includes(`.${ext}`);
+          return !file.isDirectory && ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext);
         });
 
         if (audioFiles.length > 0) {
@@ -149,12 +152,37 @@ async function scanDreamHostFTP(): Promise<any> {
           });
         }
       }
+      return playlists;
     } finally {
       client.close();
     }
   }
 
-  return { playlists };
+  // Try SFTP first (or if useSFTP is set), fallback to FTP if SFTP fails
+  if (useSFTP) {
+    try {
+      return { playlists: await scanWithSFTP() };
+    } catch (error: any) {
+      console.warn('SFTP scan failed, trying FTP fallback:', error.message);
+      try {
+        return { playlists: await scanWithFTP() };
+      } catch (ftpError: any) {
+        throw new Error(`Both SFTP and FTP failed. SFTP: ${error.message}, FTP: ${ftpError.message}`);
+      }
+    }
+  } else {
+    // Try FTP first, fallback to SFTP if FTP fails
+    try {
+      return { playlists: await scanWithFTP() };
+    } catch (error: any) {
+      console.warn('FTP scan failed, trying SFTP fallback:', error.message);
+      try {
+        return { playlists: await scanWithSFTP() };
+      } catch (sftpError: any) {
+        throw new Error(`Both FTP and SFTP failed. FTP: ${error.message}, SFTP: ${sftpError.message}`);
+      }
+    }
+  }
 }
 
 /**
