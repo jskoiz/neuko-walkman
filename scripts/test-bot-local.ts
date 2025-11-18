@@ -26,6 +26,41 @@ import { join } from 'path';
 // Load environment variables
 dotenv.config();
 
+/**
+ * Logging utility for bot activity
+ */
+interface LogEntry {
+  timestamp: string;
+  userId?: number;
+  username?: string;
+  chatId: number;
+  action: string;
+  details?: any;
+  status: 'success' | 'error' | 'info';
+  error?: string;
+}
+
+function logBotActivity(entry: LogEntry): void {
+  const timestamp = new Date().toISOString();
+  const userInfo = entry.userId 
+    ? `User ${entry.userId}${entry.username ? ` (@${entry.username})` : ''}`
+    : 'Unknown user';
+  const chatInfo = `Chat ${entry.chatId}`;
+  const statusEmoji = entry.status === 'success' ? '✅' : entry.status === 'error' ? '❌' : 'ℹ️';
+  
+  const logMessage = `[${timestamp}] ${statusEmoji} ${userInfo} | ${chatInfo} | ${entry.action}`;
+  
+  if (entry.details) {
+    console.log(logMessage, JSON.stringify(entry.details, null, 2));
+  } else {
+    console.log(logMessage);
+  }
+  
+  if (entry.error) {
+    console.error(`[${timestamp}] ERROR:`, entry.error);
+  }
+}
+
 const TELEGRAM_API_URL = 'https://api.telegram.org/bot';
 const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
 const RATE_LIMIT_REQUESTS = 5;
@@ -166,16 +201,36 @@ async function getUpdates(): Promise<any[]> {
 /**
  * Process song download and upload
  */
-async function processSongSubmission(chatId: number, url: string, playlistName?: string): Promise<void> {
+async function processSongSubmission(chatId: number, url: string, playlistName?: string, userId?: number, username?: string): Promise<void> {
+  const targetPlaylist = playlistName || 'community';
+  
+  logBotActivity({
+    timestamp: new Date().toISOString(),
+    userId,
+    username,
+    chatId,
+    action: 'SONG_SUBMISSION_STARTED',
+    details: { url, playlist: targetPlaylist },
+    status: 'info',
+  });
+
   try {
-    console.log(`[${new Date().toISOString()}] Starting song submission for chat ${chatId}, URL: ${url}`);
-    
     // Check rate limit
-    const userId = chatId.toString();
-    if (!checkRateLimit(userId, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW)) {
-      const resetTime = getResetTime(userId);
+    const userIdStr = chatId.toString();
+    if (!checkRateLimit(userIdStr, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW)) {
+      const resetTime = getResetTime(userIdStr);
       const waitSeconds = resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : 60;
-      console.log(`[${new Date().toISOString()}] Rate limit exceeded for user ${userId}`);
+      
+      logBotActivity({
+        timestamp: new Date().toISOString(),
+        userId,
+        username,
+        chatId,
+        action: 'RATE_LIMIT_EXCEEDED',
+        details: { waitSeconds },
+        status: 'info',
+      });
+      
       await sendMessage(
         botToken,
         chatId,
@@ -282,7 +337,6 @@ async function processSongSubmission(chatId: number, url: string, playlistName?:
     }
 
     // Send success message
-    console.log(`[${new Date().toISOString()}] Sending success message to chat ${chatId}`);
     const playlistDisplay = playlistName || 'community';
     await sendMessage(
       botToken,
@@ -292,11 +346,22 @@ async function processSongSubmission(chatId: number, url: string, playlistName?:
 
     // Clear session
     userSessions.delete(chatId);
-    console.log(`[${new Date().toISOString()}] Song submission completed successfully`);
-  } catch (error: any) {
-    console.error(`[${new Date().toISOString()}] Error processing song:`, error);
-    console.error(`[${new Date().toISOString()}] Error stack:`, error.stack);
     
+    logBotActivity({
+      timestamp: new Date().toISOString(),
+      userId,
+      username,
+      chatId,
+      action: 'SONG_SUBMISSION_SUCCESS',
+      details: {
+        fileName,
+        title: title || fileName,
+        playlist: playlistDisplay,
+        fileSizeMB: Math.round(buffer.length / 1024 / 1024),
+      },
+      status: 'success',
+    });
+  } catch (error: any) {
     let errorMessage = error.message || 'An unknown error occurred';
     
     if (errorMessage.includes('File too large')) {
@@ -315,13 +380,24 @@ async function processSongSubmission(chatId: number, url: string, playlistName?:
       `❌ Error: ${errorMessage}\n\nPlease make sure you're sharing a valid YouTube or Spotify link.`
     );
     userSessions.delete(chatId);
+    
+    logBotActivity({
+      timestamp: new Date().toISOString(),
+      userId,
+      username,
+      chatId,
+      action: 'SONG_SUBMISSION_FAILED',
+      details: { url, playlist: targetPlaylist, errorMessage },
+      status: 'error',
+      error: error.stack || error.message,
+    });
   }
 }
 
 /**
  * Show restricted access menu (admin only)
  */
-async function showRestrictedAccess(chatId: number, messageId?: number): Promise<void> {
+async function showRestrictedAccess(chatId: number, messageId?: number, userId?: number, username?: string): Promise<void> {
   // Delete previous message if provided
   if (messageId) {
     try {
@@ -330,6 +406,16 @@ async function showRestrictedAccess(chatId: number, messageId?: number): Promise
       // Ignore errors
     }
   }
+
+  logBotActivity({
+    timestamp: new Date().toISOString(),
+    userId,
+    username,
+    chatId,
+    action: 'ADMIN_ACCESS',
+    details: { menu: 'restricted_access' },
+    status: 'info',
+  });
 
   const buttons: Array<Array<{ text: string; callback_data: string }>> = [
     [{ text: '➕ Add Song to Any Playlist', callback_data: 'add_song_admin' }],
@@ -346,7 +432,7 @@ async function showRestrictedAccess(chatId: number, messageId?: number): Promise
 /**
  * Show list of playlists
  */
-async function showPlaylists(chatId: number, messageId?: number, isAdminUser: boolean = false, deletePrevious: boolean = true): Promise<void> {
+async function showPlaylists(chatId: number, messageId?: number, isAdminUser: boolean = false, deletePrevious: boolean = true, userId?: number, username?: string): Promise<void> {
   try {
     // Delete previous message if requested
     if (deletePrevious && messageId) {
@@ -364,6 +450,16 @@ async function showPlaylists(chatId: number, messageId?: number, isAdminUser: bo
       await sendMessage(botToken, chatId, '📋 No playlists found.');
       return;
     }
+
+    logBotActivity({
+      timestamp: new Date().toISOString(),
+      userId,
+      username,
+      chatId,
+      action: 'VIEW_PLAYLISTS',
+      details: { playlistCount: playlists.length, isAdmin: isAdminUser },
+      status: 'info',
+    });
 
     const buttons: Array<Array<{ text: string; callback_data: string }>> = [];
     const maxButtons = Math.min(playlists.length, 50);
@@ -392,7 +488,7 @@ async function showPlaylists(chatId: number, messageId?: number, isAdminUser: bo
 /**
  * Show songs in a playlist
  */
-async function showPlaylistSongs(chatId: number, playlistName: string, messageId?: number, isAdminUser: boolean = false, deletePrevious: boolean = true): Promise<void> {
+async function showPlaylistSongs(chatId: number, playlistName: string, messageId?: number, isAdminUser: boolean = false, deletePrevious: boolean = true, userId?: number, username?: string): Promise<void> {
   try {
     // Delete previous message if requested
     if (deletePrevious && messageId) {
@@ -416,6 +512,16 @@ async function showPlaylistSongs(chatId: number, playlistName: string, messageId
       await sendMessage(botToken, chatId, `📁 Playlist "${playlistName}" is empty.`);
       return;
     }
+
+    logBotActivity({
+      timestamp: new Date().toISOString(),
+      userId,
+      username,
+      chatId,
+      action: 'VIEW_PLAYLIST_SONGS',
+      details: { playlist: playlistName, trackCount: playlist.tracks.length, isAdmin: isAdminUser },
+      status: 'info',
+    });
 
     const tracks = playlist.tracks;
     const buttons: Array<Array<{ text: string; callback_data: string }>> = [];
@@ -456,10 +562,29 @@ async function showPlaylistSongs(chatId: number, playlistName: string, messageId
 /**
  * Delete a song from a playlist
  */
-async function deleteSong(chatId: number, playlistName: string, fileName: string): Promise<void> {
+async function deleteSong(chatId: number, playlistName: string, fileName: string, userId?: number, username?: string): Promise<void> {
+  logBotActivity({
+    timestamp: new Date().toISOString(),
+    userId,
+    username,
+    chatId,
+    action: 'SONG_DELETION_STARTED',
+    details: { fileName, playlist: playlistName },
+    status: 'info',
+  });
+
   try {
     if (!validatePlaylistName(playlistName)) {
       await sendMessage(botToken, chatId, '❌ Invalid playlist name.');
+      logBotActivity({
+        timestamp: new Date().toISOString(),
+        userId,
+        username,
+        chatId,
+        action: 'SONG_DELETION_FAILED',
+        details: { fileName, playlist: playlistName, reason: 'Invalid playlist name' },
+        status: 'error',
+      });
       return;
     }
 
@@ -518,12 +643,20 @@ async function deleteSong(chatId: number, playlistName: string, fileName: string
     }
 
     // Note: In production, /api/playlists.json scans FTP directly, so no update call needed
-    console.log(`[${new Date().toISOString()}] File deleted. Playlists will update automatically on next page load.`);
 
     await sendMessage(botToken, chatId, `✅ Song deleted from "${playlistName}" playlist.`);
     userSessions.delete(chatId);
+    
+    logBotActivity({
+      timestamp: new Date().toISOString(),
+      userId,
+      username,
+      chatId,
+      action: 'SONG_DELETION_SUCCESS',
+      details: { fileName, playlist: playlistName },
+      status: 'success',
+    });
   } catch (error: any) {
-    console.error('Error deleting song:', error);
     let errorMessage = error.message || 'An unknown error occurred';
     if (errorMessage.includes('not found')) {
       errorMessage = 'Song not found on server.';
@@ -532,6 +665,17 @@ async function deleteSong(chatId: number, playlistName: string, fileName: string
     }
     await sendMessage(botToken, chatId, `❌ Error: ${errorMessage}`);
     userSessions.delete(chatId);
+    
+    logBotActivity({
+      timestamp: new Date().toISOString(),
+      userId,
+      username,
+      chatId,
+      action: 'SONG_DELETION_FAILED',
+      details: { fileName, playlist: playlistName, errorMessage },
+      status: 'error',
+      error: error.stack || error.message,
+    });
   }
 }
 
@@ -540,6 +684,16 @@ async function deleteSong(chatId: number, playlistName: string, fileName: string
  */
 async function handleStartCommand(chatId: number, username?: string, userId?: number, messageId?: number): Promise<void> {
   const isAdminUser = userId ? isAdmin(userId) : false;
+  
+  logBotActivity({
+    timestamp: new Date().toISOString(),
+    userId,
+    username,
+    chatId,
+    action: 'COMMAND_START',
+    details: { isAdmin: isAdminUser },
+    status: 'info',
+  });
   
   const buttons: Array<Array<{ text: string; callback_data: string }>> = [
     [{ text: '➕ Add Song to Community', callback_data: 'add_song' }],
@@ -590,11 +744,23 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
   const messageId = callbackQuery.message?.message_id;
   const data = callbackQuery.data;
   const userId = callbackQuery.from?.id;
+  const username = callbackQuery.from?.username;
 
   if (!chatId) return;
 
   await answerCallbackQuery(botToken, callbackQuery.id);
   const isAdminUser = userId ? isAdmin(userId) : false;
+
+  // Log all button clicks
+  logBotActivity({
+    timestamp: new Date().toISOString(),
+    userId,
+    username,
+    chatId,
+    action: 'BUTTON_CLICK',
+    details: { button: data, isAdmin: isAdminUser },
+    status: 'info',
+  });
 
   if (data === 'add_song') {
     // Delete previous message
@@ -611,47 +777,73 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
   }
 
   if (data === 'view_playlists') {
-    await showPlaylists(chatId, messageId, isAdminUser, true);
+    await showPlaylists(chatId, messageId, isAdminUser, true, userId, username);
     return;
   }
 
   if (data === 'back_to_main') {
-    const username = callbackQuery.from?.username;
     await handleStartCommand(chatId, username, userId, messageId);
     return;
   }
 
   if (data === 'back_to_playlists') {
-    await showPlaylists(chatId, messageId, isAdminUser, true);
+    await showPlaylists(chatId, messageId, isAdminUser, true, userId, username);
     return;
   }
 
   // Restricted access menu
   if (data === 'restricted_access') {
     if (!isAdminUser) {
+      logBotActivity({
+        timestamp: new Date().toISOString(),
+        userId,
+        username,
+        chatId,
+        action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
+        details: { attemptedAction: 'restricted_access' },
+        status: 'error',
+      });
       await sendMessage(botToken, chatId, '❌ You do not have permission to access this area.');
       return;
     }
-    await showRestrictedAccess(chatId, messageId);
+    await showRestrictedAccess(chatId, messageId, userId, username);
     return;
   }
 
   if (data === 'add_song_admin') {
     if (!isAdminUser) {
+      logBotActivity({
+        timestamp: new Date().toISOString(),
+        userId,
+        username,
+        chatId,
+        action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
+        details: { attemptedAction: 'add_song_admin' },
+        status: 'error',
+      });
       await sendMessage(botToken, chatId, '❌ You do not have permission to perform this action.');
       return;
     }
-    await showPlaylists(chatId, messageId, isAdminUser, true);
+    await showPlaylists(chatId, messageId, isAdminUser, true, userId, username);
     userSessions.set(chatId, { type: 'selecting_playlist_for_add', messageId });
     return;
   }
 
   if (data === 'delete_song_menu') {
     if (!isAdminUser) {
+      logBotActivity({
+        timestamp: new Date().toISOString(),
+        userId,
+        username,
+        chatId,
+        action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
+        details: { attemptedAction: 'delete_song_menu' },
+        status: 'error',
+      });
       await sendMessage(botToken, chatId, '❌ You do not have permission to perform this action.');
       return;
     }
-    await showPlaylists(chatId, messageId, isAdminUser, true);
+    await showPlaylists(chatId, messageId, isAdminUser, true, userId, username);
     userSessions.set(chatId, { type: 'selecting_playlist_for_delete', messageId });
     return;
   }
@@ -680,17 +872,26 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
     }
     
     if (session?.type === 'selecting_playlist_for_delete') {
-      await showPlaylistSongs(chatId, playlistName, messageId, isAdminUser, true);
+      await showPlaylistSongs(chatId, playlistName, messageId, isAdminUser, true, userId, username);
       userSessions.set(chatId, { type: 'selecting_song_to_delete', playlistName, messageId });
       return;
     }
     
-    await showPlaylistSongs(chatId, playlistName, messageId, isAdminUser, true);
+    await showPlaylistSongs(chatId, playlistName, messageId, isAdminUser, true, userId, username);
     return;
   }
 
   if (data.startsWith('delete_song_')) {
     if (!isAdminUser) {
+      logBotActivity({
+        timestamp: new Date().toISOString(),
+        userId,
+        username,
+        chatId,
+        action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
+        details: { attemptedAction: 'delete_song' },
+        status: 'error',
+      });
       await sendMessage(botToken, chatId, '❌ You do not have permission to perform this action.');
       return;
     }
@@ -724,7 +925,7 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
       
       const track = playlist.tracks[trackIndex];
       const fileName = track.fileName.split('/').pop() || '';
-      await deleteSong(chatId, playlistName, fileName);
+      await deleteSong(chatId, playlistName, fileName, userId, username);
     } catch (error) {
       console.error('Error getting track info:', error);
       await sendMessage(botToken, chatId, '❌ Error deleting song.');
@@ -750,6 +951,17 @@ async function handleCallbackQuery(callbackQuery: any): Promise<void> {
       const playlist = playlists.find(p => p.name === playlistName);
       if (playlist && playlist.tracks && playlist.tracks[songIndex]) {
         const track = playlist.tracks[songIndex];
+        
+        logBotActivity({
+          timestamp: new Date().toISOString(),
+          userId,
+          username,
+          chatId,
+          action: 'VIEW_SONG',
+          details: { playlist: playlistName, trackName: track.trackName, trackIndex: songIndex },
+          status: 'info',
+        });
+        
         await sendMessage(botToken, chatId, `🎵 **${track.trackName}**\n\n📁 Playlist: ${playlistName}\n🎵 Track #${track.trackNumber}`);
       }
     } catch (error) {
@@ -766,6 +978,7 @@ async function handleMessage(message: any): Promise<void> {
   const chatId = message.chat.id;
   const text = message.text?.trim();
   const userId = message.from?.id;
+  const username = message.from?.username;
 
   if (!text) return;
 
@@ -773,6 +986,17 @@ async function handleMessage(message: any): Promise<void> {
   if (!checkRateLimit(userIdStr, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW)) {
     const resetTime = getResetTime(userIdStr);
     const waitSeconds = resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : 60;
+    
+    logBotActivity({
+      timestamp: new Date().toISOString(),
+      userId,
+      username,
+      chatId,
+      action: 'RATE_LIMIT_EXCEEDED',
+      details: { waitSeconds, message: text.substring(0, 50) },
+      status: 'info',
+    });
+    
     await sendMessage(botToken, chatId, `⏳ Rate limit exceeded. Please wait ${waitSeconds} seconds before trying again.`);
     return;
   }
@@ -787,10 +1011,20 @@ async function handleMessage(message: any): Promise<void> {
         return;
       }
       const playlistName = session.playlistName;
-      processSongSubmission(chatId, text, playlistName).catch((error) => {
+      processSongSubmission(chatId, text, playlistName, userId, username).catch((error) => {
         console.error('Background processing error:', error);
       });
     } else {
+      logBotActivity({
+        timestamp: new Date().toISOString(),
+        userId,
+        username,
+        chatId,
+        action: 'INVALID_URL_SUBMITTED',
+        details: { url: text.substring(0, 100) },
+        status: 'info',
+      });
+      
       await sendMessage(botToken, chatId, '❌ Invalid URL. Please share a valid YouTube or Spotify link.\n\n' +
         'Examples:\n' +
         '• https://www.youtube.com/watch?v=...\n' +
@@ -802,16 +1036,36 @@ async function handleMessage(message: any): Promise<void> {
   }
 
   if (text.startsWith('/start')) {
-    const username = message.from?.username;
     await handleStartCommand(chatId, username, userId);
     return;
   }
 
   if (text.startsWith('/playlists')) {
     const isAdminUser = userId ? isAdmin(userId) : false;
-    await showPlaylists(chatId, undefined, isAdminUser, false);
+    
+    logBotActivity({
+      timestamp: new Date().toISOString(),
+      userId,
+      username,
+      chatId,
+      action: 'COMMAND_PLAYLISTS',
+      details: { isAdmin: isAdminUser },
+      status: 'info',
+    });
+    
+    await showPlaylists(chatId, undefined, isAdminUser, false, userId, username);
     return;
   }
+
+  logBotActivity({
+    timestamp: new Date().toISOString(),
+    userId,
+    username,
+    chatId,
+    action: 'MESSAGE_RECEIVED',
+    details: { text: text.substring(0, 100) },
+    status: 'info',
+  });
 
   await sendMessage(botToken, chatId, '👋 Use /start to see available options!');
 }
@@ -889,6 +1143,11 @@ async function main() {
   // Polling loop
   let conflictCount = 0;
   let consecutiveErrors = 0;
+  let totalUpdatesProcessed = 0;
+  
+  console.log('[bot] 📊 Logging enabled - all user activity will be logged');
+  console.log('[bot] 🔍 Log format: [timestamp] [status] User [ID] (@username) | Chat [ID] | [ACTION]');
+  console.log('');
   
   while (true) {
     try {
@@ -896,8 +1155,19 @@ async function main() {
       conflictCount = 0; // Reset conflict count on success
       consecutiveErrors = 0; // Reset error count on success
       
+      if (updates.length > 0) {
+        logBotActivity({
+          timestamp: new Date().toISOString(),
+          chatId: 0,
+          action: 'UPDATES_RECEIVED',
+          details: { count: updates.length },
+          status: 'info',
+        });
+      }
+      
       for (const update of updates) {
         lastUpdateId = update.update_id;
+        totalUpdatesProcessed++;
 
         // Handle callback queries
         if (update.callback_query) {
