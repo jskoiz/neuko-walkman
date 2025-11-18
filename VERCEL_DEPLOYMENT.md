@@ -1,6 +1,8 @@
 # Vercel Deployment Guide
 
-## ⚠️ Important: Deployment Protection
+This guide covers deploying the Pirate Radio website to Vercel. The Telegram bot runs locally and is **not** deployed to Vercel.
+
+## Important: Deployment Protection
 
 If your Vercel deployment shows "Authentication Required", you need to **disable deployment protection** or configure it to allow public access to API routes.
 
@@ -13,26 +15,6 @@ If your Vercel deployment shows "Authentication Required", you need to **disable
 
 **Alternative:** Deploy to **production** (not preview) - production deployments are usually public by default.
 
-## How the Telegram Bot Works on Vercel
-
-**Important:** 
-- **Production:** The bot runs automatically on Vercel via **webhook** (serverless)
-- **Dev/Preview:** Webhooks are **disabled** - run the bot locally with `npm run bot:local`
-
-### How It Works
-
-1. **Local Development / Dev Branch (Polling Mode):**
-   - Run `npm run bot:local` or `npm run dev:bot`
-   - Bot automatically deletes webhook if one exists
-   - Bot continuously polls Telegram for new messages
-   - Perfect for development and testing
-
-2. **Vercel Production (Webhook Mode):**
-   - Bot is deployed as an API route: `/api/telegram-webhook`
-   - **Only works on production deployments** (dev/preview deployments reject webhooks)
-   - Telegram sends updates directly to your Vercel URL
-   - No separate process needed - it's serverless!
-
 ## Setup Steps
 
 ### 1. Deploy to Vercel
@@ -42,131 +24,136 @@ If your Vercel deployment shows "Authentication Required", you need to **disable
 vercel --prod
 ```
 
-### 2. Set Environment Variables in Vercel
+Or connect your GitHub repository to Vercel for automatic deployments.
+
+### 2. Set Environment Variables
 
 Go to Vercel Dashboard → Your Project → Settings → Environment Variables:
 
 **Required:**
-- `TELEGRAM_BOT_TOKEN` - Your bot token from @BotFather
-- `SPOTIPY_CLIENT_ID` - Spotify API client ID
-- `SPOTIPY_CLIENT_SECRET` - Spotify API client secret
-- `DREAMHOST_FTP_HOST` - FTP host (e.g., files.bloc.rocks)
+- `DREAMHOST_FTP_HOST` - FTP host (e.g., `files.bloc.rocks`)
 - `DREAMHOST_FTP_USER` - FTP username
 - `DREAMHOST_FTP_PASSWORD` - FTP password
-- `DREAMHOST_FTP_PATH` - Remote path (e.g., /public/music/community)
-- `PUBLIC_SITE_URL` - Your Vercel URL: `https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app`
+- `DREAMHOST_FTP_PATH` - Remote path (e.g., `/public/music`)
+- `PUBLIC_SITE_URL` - Your Vercel deployment URL (e.g., `https://your-app.vercel.app`)
 
 **Optional:**
-- `TELEGRAM_WEBHOOK_SECRET` - Secret token for webhook security (recommended)
-- `MAX_FILE_SIZE` - Max file size in bytes (default: 52428800 = 50MB)
-- `DREAMHOST_USE_SFTP` - Set to "true" if using SFTP instead of FTP
+- `SPOTIPY_CLIENT_ID` - Spotify API client ID (if using Spotify features)
+- `SPOTIPY_CLIENT_SECRET` - Spotify API secret (if using Spotify features)
+- `MAX_FILE_SIZE` - Max file size in bytes (default: `52428800` = 50MB)
+- `DREAMHOST_USE_SFTP` - Set to `"true"` if using SFTP instead of FTP
+- `PLAYLIST_UPDATE_TOKEN` - Optional auth token for securing playlist update endpoint
 
-### 3. Set Up Telegram Webhook (PRODUCTION ONLY)
+**Note:** Telegram bot environment variables (`TELEGRAM_BOT_TOKEN`, etc.) are **not** needed in Vercel since the bot runs locally.
 
-⚠️ **IMPORTANT:** Only set webhook for **PRODUCTION** deployments! Dev/preview deployments will reject webhook requests automatically.
+### 3. Verify Deployment
 
-After **production** deployment, configure Telegram to send updates to your Vercel URL:
+After deployment:
 
-**Your Production Vercel URL:** `https://your-app.vercel.app` (NOT the preview/dev URL)
+1. Visit your Vercel URL
+2. Check that the website loads correctly
+3. Verify playlists are loading from FTP
+4. Test API endpoints:
+   ```bash
+   curl https://your-app.vercel.app/api/playlists.json
+   ```
 
-**Option A: Using the script (easiest)**
-```bash
-# Make sure TELEGRAM_BOT_TOKEN is in your .env file
-# Script will warn if you try to use a dev/preview URL
-npm run setup-webhook https://your-production-app.vercel.app [your-webhook-secret]
-```
+## How It Works
 
-**Option B: Using curl manually**
-```bash
-# Without secret token
-curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app/api/telegram-webhook"}'
+### Website Deployment
 
-# With secret token (recommended)
-curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app/api/telegram-webhook",
-    "secret_token": "your-webhook-secret-here"
-  }'
-```
+- **Astro Site**: Deployed as a serverless application
+- **API Routes**: `/api/playlists.json` and `/api/update-playlists` run as serverless functions
+- **Dynamic Playlists**: API endpoints scan DreamHost FTP to generate playlists on-the-fly
+- **No Build-Time Playlists**: Playlists are always fetched dynamically from FTP
 
-### 4. Verify Webhook is Working
+### Telegram Bot (Local Only)
 
-```bash
-# Check webhook status
-curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
-```
+The Telegram bot is **not** deployed to Vercel:
 
-You should see:
-- `"url": "https://your-app.vercel.app/api/telegram-webhook"`
-- `"pending_update_count": 0` (or a small number)
+- Runs locally using polling mode (`npm run bot:local`)
+- Automatically deletes webhooks to enable polling
+- Handles song submissions and uploads to DreamHost FTP
+- Triggers playlist updates via API endpoint
 
-### 5. Test the Bot
-
-1. Open Telegram and find your bot
-2. Send `/start` to the bot
-3. You should receive a welcome message with the photo
-4. Click "Add New Song" and test adding a song
+See [TELEGRAM_BOT_SETUP.md](./TELEGRAM_BOT_SETUP.md) for bot setup instructions.
 
 ## Troubleshooting
 
-### Bot doesn't respond
+### Website doesn't load playlists
 
-1. **Check webhook is set:**
-   ```bash
-   curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
-   ```
+1. **Check Environment Variables:**
+   - Verify FTP credentials are set in Vercel dashboard
+   - Ensure `PUBLIC_SITE_URL` matches your Vercel URL
+   - Redeploy after adding/updating environment variables
 
-2. **Check Vercel logs:**
+2. **Check Vercel Logs:**
    - Go to Vercel Dashboard → Your Project → Deployments
    - Click on the latest deployment → Functions tab
-   - Check for errors in `/api/telegram-webhook`
+   - Check for errors in `/api/playlists.json`
 
-3. **Verify environment variables:**
-   - Make sure all required env vars are set in Vercel
-   - Redeploy after adding new env vars
-
-4. **Test the endpoint manually:**
+3. **Test API Endpoint:**
    ```bash
-   # This should return an error about missing update, but confirms endpoint works
-   curl -X POST https://neuko-walkman-git-dev-jerrys-projects-56fec7b3.vercel.app/api/telegram-webhook \
-     -H "Content-Type: application/json" \
-     -d '{}'
+   curl https://your-app.vercel.app/api/playlists.json
    ```
+   Should return JSON with playlists array.
 
-### Webhook returns 401 Unauthorized
+### FTP Connection Errors
 
-- Make sure `TELEGRAM_WEBHOOK_SECRET` in Vercel matches the secret token you set in the webhook
-- Or remove the secret token from both places if you don't want to use it
+- Verify FTP credentials are correct in Vercel environment variables
+- Check that `DREAMHOST_FTP_PATH` exists and is accessible
+- Ensure firewall allows FTP/SFTP connections
+- Try setting `DREAMHOST_USE_SFTP=true` if FTP fails
 
-### Bot responds but song upload fails
+### Playlists are empty
 
-- Check FTP credentials in Vercel environment variables
-- Verify the FTP path exists and is writable
+- Verify music files exist on DreamHost FTP
+- Check that directory structure matches expected format (folders = playlists)
+- Ensure audio files have supported extensions (mp3, wav, ogg, m4a, aac, flac)
+- Check Vercel function logs for scanning errors
+
+### API endpoint returns 500 error
+
 - Check Vercel function logs for detailed error messages
+- Verify all required environment variables are set
+- Ensure FTP credentials are correct
+- Check that FTP server is accessible from Vercel's network
 
-## Local Testing vs Production
+## Environment Variables Reference
 
-| Feature | Local (`npm run dev:bot`) | Vercel (Webhook) |
-|---------|-------------------------|------------------|
-| Mode | Polling (checks for messages) | Webhook (receives messages) |
-| Process | Continuous running process | Serverless function |
-| Setup | Just run the command | Set webhook URL |
-| Use Case | Development & testing | Production |
+| Variable | Required | Description |
+|---------|----------|-------------|
+| `DREAMHOST_FTP_HOST` | Yes | FTP/SFTP hostname |
+| `DREAMHOST_FTP_USER` | Yes | FTP username |
+| `DREAMHOST_FTP_PASSWORD` | Yes | FTP password |
+| `DREAMHOST_FTP_PATH` | Yes | Base path for music files |
+| `PUBLIC_SITE_URL` | Yes | Your Vercel deployment URL |
+| `DREAMHOST_USE_SFTP` | No | Set to `"true"` for SFTP |
+| `SPOTIPY_CLIENT_ID` | No | Spotify API client ID |
+| `SPOTIPY_CLIENT_SECRET` | No | Spotify API secret |
+| `MAX_FILE_SIZE` | No | Max file size in bytes (default: 52428800) |
+| `PLAYLIST_UPDATE_TOKEN` | No | Auth token for playlist updates |
+
+## Deployment Workflow
+
+1. **Push to Repository**: Changes trigger automatic deployment
+2. **Vercel Build**: Runs `npm run build` (which generates playlists)
+3. **Deploy**: Serverless functions and static assets are deployed
+4. **Runtime**: API endpoints scan FTP dynamically on each request
 
 ## Important Notes
 
-- **Production:** You don't need to run the bot locally - it works automatically on Vercel via webhook
-- **Dev Branch:** Webhooks are automatically disabled. Use `npm run bot:local` to run locally
-- The webhook endpoint is at: `https://your-production-app.vercel.app/api/telegram-webhook`
-- **Dev/preview deployments will reject webhook requests** (returns 403) - this is intentional
-- After setting the webhook, Telegram will send ALL bot messages to your production Vercel deployment
-- To delete webhook for local testing:
-  ```bash
-  npm run delete-webhook
-  # or manually:
-  curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/deleteWebhook"
-  ```
+- **No Static Playlists**: Playlists are always generated dynamically from FTP
+- **No Bot Deployment**: Telegram bot runs locally, not on Vercel
+- **API Routes**: `/api/playlists.json` scans FTP on every request (no caching)
+- **Environment Variables**: Must be set in Vercel dashboard, not just `.env` file
+- **Redeploy Required**: After adding/updating environment variables, redeploy the project
 
+## Next Steps
+
+After successful deployment:
+
+1. Verify website loads and playlists display correctly
+2. Set up Telegram bot locally (see [TELEGRAM_BOT_SETUP.md](./TELEGRAM_BOT_SETUP.md))
+3. Test song submission via Telegram bot
+4. Verify songs appear on website after upload

@@ -1,45 +1,5 @@
 import type { Track, Playlist } from '../types/track';
 
-export async function loadPlaylists(): Promise<Playlist[]> {
-  try {
-    // Try dynamic API endpoint first (scans DreamHost FTP)
-    const response = await fetch('/api/playlists.json');
-    if (response.ok) {
-      const data = await response.json();
-      if (data.playlists && data.playlists.length > 0) {
-        return data.playlists as Playlist[];
-      }
-    }
-  } catch (error) {
-    console.log('Dynamic playlists API failed, trying static file...');
-  }
-
-  try {
-    // Fallback to static playlists.json file
-    const response = await fetch('/playlists.json');
-    if (response.ok) {
-      const data = await response.json();
-      return data.playlists as Playlist[];
-    }
-  } catch (error) {
-    console.log('No playlist manifest found, using default structure');
-  }
-
-  const playlists: Playlist[] = [];
-  
-  const defaultPlaylist: Playlist = {
-    name: 'Default',
-    path: '/music',
-    tracks: [],
-    index: 1,
-    total: 1
-  };
-  
-  playlists.push(defaultPlaylist);
-  
-  return playlists;
-}
-
 export function createTracksFromFiles(
   files: string[],
   playlistName: string,
