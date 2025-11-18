@@ -2,6 +2,11 @@
 // This page uses SSR to load playlists dynamically
 export const prerender = false;
 
+// Set cache headers to prevent caching of this page
+Astro.response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+Astro.response.headers.set('Pragma', 'no-cache');
+Astro.response.headers.set('Expires', '0');
+
 import { CDPlayerInterface } from "../components/CDPlayerInterface";
 import { validateTracks } from "../utils/tracks";
 import type { Track } from "../types/track";
@@ -11,30 +16,40 @@ import playlistsData from "../config/playlists.json";
 import Analytics from "@vercel/analytics/astro";
 
 // Always load playlists dynamically from API (scans FTP in production)
-// Only use static file as absolute last resort
+// In production, FTP credentials are set, so API will always scan FTP directly
 let playlists: Playlist[] = [];
 
 // In SSR mode, fetch from dynamic API endpoint (always scans FTP when credentials are set)
+const baseUrl = Astro.url.origin;
+const apiUrl = `${baseUrl}/api/playlists.json`;
+
 try {
-  // Use Astro.url to get the current request URL
-  const baseUrl = Astro.url.origin;
-  const apiUrl = `${baseUrl}/api/playlists.json`;
   const response = await fetch(apiUrl, {
     cache: 'no-store', // Never cache - always get fresh data
+    headers: {
+      'Cache-Control': 'no-cache',
+    },
   });
+  
   if (response.ok) {
     const data = await response.json();
-    if (data.playlists && data.playlists.length > 0) {
+    if (data.playlists && Array.isArray(data.playlists) && data.playlists.length > 0) {
       playlists = data.playlists;
+      console.log(`Loaded ${playlists.length} playlist(s) from API`);
+    } else {
+      console.warn('API returned empty playlists array');
     }
+  } else {
+    console.error(`API returned status ${response.status}: ${response.statusText}`);
   }
 } catch (error) {
-  console.log('Failed to load dynamic playlists from API:', error);
+  console.error('Failed to load dynamic playlists from API:', error);
 }
 
-// Only use static file if API completely failed and we have no playlists
+// Only use static file as absolute last resort (for local dev when FTP not configured)
+// In production, this should never happen since FTP credentials are required
 if (playlists.length === 0) {
-  console.log('Falling back to static playlists.json file');
+  console.warn('No playlists from API, falling back to static file (this should not happen in production)');
   playlists = playlistsData.playlists || [];
 }
 

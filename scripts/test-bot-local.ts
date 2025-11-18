@@ -504,20 +504,21 @@ async function deleteSong(chatId: number, playlistName: string, fileName: string
     }
 
     // Wait a moment for FTP server to fully process the deletion
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const siteUrl = process.env.PUBLIC_SITE_URL || 'http://localhost:4321';
+    // Regenerate playlists locally (for local dev)
     try {
-      const updateResponse = await fetch(`${siteUrl}/api/update-playlists`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!updateResponse.ok) {
-        console.error('Playlist update returned non-OK status:', updateResponse.status);
-      }
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+      await execAsync('npm run generate-playlists');
+      console.log(`[${new Date().toISOString()}] Regenerated playlists locally`);
     } catch (error) {
-      console.error('Failed to update playlists:', error);
+      console.error(`[${new Date().toISOString()}] Failed to regenerate playlists locally:`, error);
     }
+
+    // Note: In production, /api/playlists.json scans FTP directly, so no update call needed
+    console.log(`[${new Date().toISOString()}] File deleted. Playlists will update automatically on next page load.`);
 
     await sendMessage(botToken, chatId, `✅ Song deleted from "${playlistName}" playlist.`);
     userSessions.delete(chatId);

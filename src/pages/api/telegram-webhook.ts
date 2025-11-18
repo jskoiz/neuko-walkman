@@ -375,23 +375,11 @@ async function deleteSong(
     }
 
     // Wait a moment for FTP server to fully process the deletion
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Trigger playlist update
-    const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'http://localhost:4321';
-    try {
-      const updateResponse = await fetch(`${siteUrl}/api/update-playlists`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!updateResponse.ok) {
-        console.error('Playlist update returned non-OK status:', updateResponse.status);
-      }
-    } catch (error) {
-      console.error('Failed to update playlists:', error);
-    }
+    // Note: No need to call /api/update-playlists - /api/playlists.json scans FTP directly
+    // The page will automatically show updated playlists on next request since it uses the API
+    console.log('File deleted from FTP. Playlists will update automatically on next page load.');
 
     await sendMessage(
       botToken,
