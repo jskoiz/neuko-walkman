@@ -336,6 +336,15 @@ export function isAdmin(userId: number): boolean {
  * Fetch playlists from the API or local file
  * Falls back to reading local file if API is not available
  */
+// Simple in-memory cache for playlists to improve bot responsiveness
+interface PlaylistCacheEntry {
+  data: any[];
+  timestamp: number;
+}
+
+const playlistCache: Map<string, PlaylistCacheEntry> = new Map();
+const PLAYLIST_CACHE_TTL = 30 * 1000; // 30 seconds cache
+
 export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
   // Try to get baseUrl from various sources
   let baseUrl: string | undefined;
@@ -361,6 +370,15 @@ export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
     baseUrl = siteUrl || DEFAULT_SITE_URL;
   }
 
+  // Check cache first
+  const cacheKey = baseUrl;
+  const cached = playlistCache.get(cacheKey);
+  const now = Date.now();
+  
+  if (cached && (now - cached.timestamp) < PLAYLIST_CACHE_TTL) {
+    return cached.data;
+  }
+
   const url = `${baseUrl}/api/playlists.json`;
 
   try {
@@ -369,8 +387,22 @@ export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
       throw new Error(`Failed to fetch playlists: ${response.status}`);
     }
     const data = await response.json();
-    return data.playlists || [];
+    const playlists = data.playlists || [];
+    
+    // Cache the result
+    playlistCache.set(cacheKey, {
+      data: playlists,
+      timestamp: now,
+    });
+    
+    return playlists;
   } catch (error) {
+    // If API fetch fails, try cache (even if expired) as fallback
+    if (cached) {
+      console.warn('API fetch failed, using stale cache');
+      return cached.data;
+    }
+    
     // If API fetch fails, silently try reading from local file (expected in local dev)
     try {
       // Check if we're in Node.js context and can read files
@@ -385,13 +417,29 @@ export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
           playlistsPath = path.join(process.cwd(), 'src', 'config', 'playlists.json');
           const data = await fs.readFile(playlistsPath, 'utf-8');
           const parsed = JSON.parse(data);
-          return parsed.playlists || [];
+          const playlists = parsed.playlists || [];
+          
+          // Cache local file result too
+          playlistCache.set(cacheKey, {
+            data: playlists,
+            timestamp: now,
+          });
+          
+          return playlists;
         } catch {
           // Try public directory as fallback
           playlistsPath = path.join(process.cwd(), 'public', 'playlists.json');
           const data = await fs.readFile(playlistsPath, 'utf-8');
           const parsed = JSON.parse(data);
-          return parsed.playlists || [];
+          const playlists = parsed.playlists || [];
+          
+          // Cache local file result too
+          playlistCache.set(cacheKey, {
+            data: playlists,
+            timestamp: now,
+          });
+          
+          return playlists;
         }
       }
     } catch (fileError) {

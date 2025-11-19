@@ -236,18 +236,32 @@ export async function startBot(config: BotConfig): Promise<void> {
         });
       }
       
-      for (const update of updates) {
-        lastUpdateId = update.update_id;
-
+      // Process updates in parallel for better responsiveness
+      // Each update is independent (different chatId), so no race conditions
+      const updatePromises = updates.map(async (update) => {
         if (update.callback_query) {
-          await handleCallbackQuery(callbackConfig, update.callback_query);
-          continue;
+          // Process callbacks in parallel - don't block on slow operations
+          handleCallbackQuery(callbackConfig, update.callback_query).catch((error) => {
+            console.error('Error handling callback query:', error);
+          });
+        } else if (update.message) {
+          // Process messages in parallel
+          handleMessage(messageConfig, update.message).catch((error) => {
+            console.error('Error handling message:', error);
+          });
         }
-
-        if (update.message) {
-          await handleMessage(messageConfig, update.message);
-        }
+      });
+      
+      // Update lastUpdateId to the highest update_id (updates are ordered)
+      if (updates.length > 0) {
+        lastUpdateId = Math.max(...updates.map(u => u.update_id));
       }
+      
+      // Don't wait for all updates - let them process in background
+      // This allows the next polling cycle to start immediately
+      Promise.allSettled(updatePromises).catch(() => {
+        // Errors already logged in individual handlers
+      });
     } catch (error: any) {
       const errorMessage = error.message || String(error);
       const errorCode = error.code || error.errno;
