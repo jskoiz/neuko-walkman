@@ -5,6 +5,7 @@
 import { Client } from 'basic-ftp';
 import { Readable } from 'stream';
 import SftpClient from 'ssh2-sftp-client';
+import { FTP_TIMEOUT, ERROR_MESSAGES } from '../constants';
 
 interface UploadOptions {
   host: string;
@@ -17,26 +18,29 @@ interface UploadOptions {
 /**
  * Upload a file buffer to Dreamhost via FTP or SFTP
  */
+/**
+ * Upload a file buffer, stream, or file path to Dreamhost via FTP or SFTP
+ */
 export async function uploadToDreamhost(
-  buffer: Buffer,
+  input: Buffer | Readable | string,
   fileName: string,
   options: UploadOptions
 ): Promise<string> {
   // Sanitize filename one more time before upload
   const sanitizedFileName = sanitizeFileName(fileName);
-  
+
   // Try SFTP first if useSFTP is true, otherwise try FTP
   if (options.useSFTP) {
-    return await uploadViaSFTP(buffer, sanitizedFileName, options);
+    return await uploadViaSFTP(input, sanitizedFileName, options);
   } else {
     // Try FTP first, fallback to SFTP on login error
     try {
-      return await uploadViaFTP(buffer, sanitizedFileName, options);
+      return await uploadViaFTP(input, sanitizedFileName, options);
     } catch (error: any) {
       // If FTP login fails, try SFTP as fallback
       if (error.message.includes('530') || error.message.includes('Login incorrect')) {
         console.log(`[${new Date().toISOString()}] FTP login failed, trying SFTP...`);
-        return await uploadViaSFTP(buffer, sanitizedFileName, options);
+        return await uploadViaSFTP(input, sanitizedFileName, options);
       }
       throw error;
     }
@@ -47,7 +51,7 @@ export async function uploadToDreamhost(
  * Upload via FTP
  */
 async function uploadViaFTP(
-  buffer: Buffer,
+  input: Buffer | Readable | string,
   fileName: string,
   options: UploadOptions
 ): Promise<string> {
@@ -56,14 +60,14 @@ async function uploadViaFTP(
 
   try {
     console.log(`[${new Date().toISOString()}] Connecting to FTP: ${options.host} as ${options.user}`);
-    
+
     // Connect to FTP server with timeout
     await client.access({
       host: options.host,
       user: options.user,
       password: options.password,
       secure: false, // Use plain FTP
-      timeout: 30000, // 30 second timeout
+      timeout: FTP_TIMEOUT,
     });
 
     console.log(`[${new Date().toISOString()}] FTP connected successfully`);
@@ -77,22 +81,27 @@ async function uploadViaFTP(
       console.log(`[${new Date().toISOString()}] Directory check:`, error);
     }
 
-    // Create readable stream from buffer
-    const stream = Readable.from(buffer);
+    // Prepare source for upload
+    let source: Readable | string;
+    if (Buffer.isBuffer(input)) {
+      source = Readable.from(input);
+    } else {
+      source = input;
+    }
 
     // Upload file
     const remoteFilePath = `${options.remotePath}/${fileName}`;
     console.log(`[${new Date().toISOString()}] Uploading file to: ${remoteFilePath}`);
-    await client.uploadFrom(stream, remoteFilePath);
+    await client.uploadFrom(source, remoteFilePath);
 
     console.log(`[${new Date().toISOString()}] FTP upload complete`);
     return remoteFilePath;
   } catch (error: any) {
     if (error.message.includes('timeout')) {
-      throw new Error('FTP connection timed out. Please try again.');
+      throw new Error(ERROR_MESSAGES.FTP_ERROR);
     }
     if (error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
-      throw new Error('Could not connect to FTP server. Please check server configuration.');
+      throw new Error(ERROR_MESSAGES.FTP_ERROR);
     }
     throw error;
   } finally {
@@ -104,15 +113,15 @@ async function uploadViaFTP(
  * Upload via SFTP
  */
 async function uploadViaSFTP(
-  buffer: Buffer,
+  input: Buffer | Readable | string,
   fileName: string,
   options: UploadOptions
 ): Promise<string> {
   const client = new SftpClient();
-  
+
   try {
     console.log(`[${new Date().toISOString()}] Connecting to SFTP: ${options.host} as ${options.user}`);
-    
+
     await client.connect({
       host: options.host,
       username: options.user,
@@ -136,16 +145,16 @@ async function uploadViaSFTP(
     // Upload file
     const remoteFilePath = `${options.remotePath}/${fileName}`;
     console.log(`[${new Date().toISOString()}] Uploading file to: ${remoteFilePath}`);
-    await client.put(buffer, remoteFilePath);
+    await client.put(input, remoteFilePath);
 
     console.log(`[${new Date().toISOString()}] SFTP upload complete`);
     return remoteFilePath;
   } catch (error: any) {
     if (error.message.includes('timeout')) {
-      throw new Error('SFTP connection timed out. Please try again.');
+      throw new Error(ERROR_MESSAGES.FTP_ERROR);
     }
     if (error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
-      throw new Error('Could not connect to SFTP server. Please check server configuration.');
+      throw new Error(ERROR_MESSAGES.FTP_ERROR);
     }
     throw new Error(`SFTP upload failed: ${error.message}`);
   } finally {
@@ -176,7 +185,7 @@ export async function deleteFromDreamhost(
   // (uploaded files are sanitized and converted to lowercase via sanitizeFileName)
   const normalizedFileName = fileName.toLowerCase();
   const remoteFilePath = `${options.remotePath}/${normalizedFileName}`;
-  
+
   if (options.useSFTP) {
     await deleteViaSFTP(remoteFilePath, options);
   } else {
@@ -207,27 +216,27 @@ async function deleteViaFTP(
 
   try {
     console.log(`[${new Date().toISOString()}] Connecting to FTP: ${options.host} as ${options.user}`);
-    
+
     await client.access({
       host: options.host,
       user: options.user,
       password: options.password,
       secure: false,
-      timeout: 30000,
+      timeout: FTP_TIMEOUT,
     });
 
     console.log(`[${new Date().toISOString()}] FTP connected successfully`);
     console.log(`[${new Date().toISOString()}] Deleting file: ${remoteFilePath}`);
-    
+
     await client.remove(remoteFilePath);
 
     console.log(`[${new Date().toISOString()}] FTP delete complete`);
   } catch (error: any) {
     if (error.message.includes('timeout')) {
-      throw new Error('FTP connection timed out. Please try again.');
+      throw new Error(ERROR_MESSAGES.FTP_ERROR);
     }
     if (error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
-      throw new Error('Could not connect to FTP server. Please check server configuration.');
+      throw new Error(ERROR_MESSAGES.FTP_ERROR);
     }
     if (error.message.includes('550') || error.message.includes('not found')) {
       throw new Error('File not found on server.');
@@ -246,10 +255,10 @@ async function deleteViaSFTP(
   options: UploadOptions
 ): Promise<void> {
   const client = new SftpClient();
-  
+
   try {
     console.log(`[${new Date().toISOString()}] Connecting to SFTP: ${options.host} as ${options.user}`);
-    
+
     await client.connect({
       host: options.host,
       username: options.user,
@@ -259,16 +268,16 @@ async function deleteViaSFTP(
 
     console.log(`[${new Date().toISOString()}] SFTP connected successfully`);
     console.log(`[${new Date().toISOString()}] Deleting file: ${remoteFilePath}`);
-    
+
     await client.delete(remoteFilePath);
 
     console.log(`[${new Date().toISOString()}] SFTP delete complete`);
   } catch (error: any) {
     if (error.message.includes('timeout')) {
-      throw new Error('SFTP connection timed out. Please try again.');
+      throw new Error(ERROR_MESSAGES.FTP_ERROR);
     }
     if (error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
-      throw new Error('Could not connect to SFTP server. Please check server configuration.');
+      throw new Error(ERROR_MESSAGES.FTP_ERROR);
     }
     if (error.message.includes('No such file') || error.message.includes('not found')) {
       throw new Error('File not found on server.');
@@ -284,7 +293,7 @@ async function deleteViaSFTP(
  */
 export async function testFTPConnection(options: UploadOptions): Promise<boolean> {
   const client = new Client();
-  
+
   try {
     await client.access({
       host: options.host,
@@ -292,7 +301,7 @@ export async function testFTPConnection(options: UploadOptions): Promise<boolean
       password: options.password,
       secure: false,
     });
-    
+
     await client.list();
     return true;
   } catch (error) {

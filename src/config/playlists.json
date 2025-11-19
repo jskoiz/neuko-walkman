@@ -76,6 +76,16 @@
         },
         {
           "trackNumber": 6,
+          "trackName": "Dave_AJ_Tracey_-_Thiago_Silva",
+          "fileName": "/music/community/Dave_AJ_Tracey_-_Thiago_Silva.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 7,
           "trackName": "Dream_Theater_-_Pull_Me_Under",
           "fileName": "/music/community/Dream_Theater_-_Pull_Me_Under.mp3",
           "duration": "0:00",
@@ -85,7 +95,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 7,
+          "trackNumber": 8,
           "trackName": "Frank_Ocean_-_White_Ferrari",
           "fileName": "/music/community/Frank_Ocean_-_White_Ferrari.mp3",
           "duration": "0:00",
@@ -95,7 +105,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 8,
+          "trackNumber": 9,
           "trackName": "Jamie_s_Elsewhere_-_Traveler_OFFICIAL_MUSIC_VIDEO_",
           "fileName": "/music/community/Jamie_s_Elsewhere_-_Traveler_OFFICIAL_MUSIC_VIDEO_.mp3",
           "duration": "0:00",
@@ -105,7 +115,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 9,
+          "trackNumber": 10,
           "trackName": "Juice_WRLD_-_Lucid_Dreams",
           "fileName": "/music/community/Juice_WRLD_-_Lucid_Dreams.mp3",
           "duration": "0:00",
@@ -115,7 +125,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 10,
+          "trackNumber": 11,
           "trackName": "Massive_Attack_-_Unfinished_Sympathy",
           "fileName": "/music/community/Massive_Attack_-_Unfinished_Sympathy.mp3",
           "duration": "0:00",
@@ -125,7 +135,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 11,
+          "trackNumber": 12,
           "trackName": "Oasis_-_Wonderwall_Official_Video_",
           "fileName": "/music/community/Oasis_-_Wonderwall_Official_Video_.mp3",
           "duration": "0:00",
@@ -135,7 +145,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 12,
+          "trackNumber": 13,
           "trackName": "Owl_City_-_Fireflies",
           "fileName": "/music/community/Owl_City_-_Fireflies.mp3",
           "duration": "0:00",
@@ -145,7 +155,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 13,
+          "trackNumber": 14,
           "trackName": "Ozzy_Osbourne_-_Believer",
           "fileName": "/music/community/Ozzy_Osbourne_-_Believer.mp3",
           "duration": "0:00",
@@ -155,7 +165,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 14,
+          "trackNumber": 15,
           "trackName": "Ozzy_Osbourne_-_Waiting_for_Darkness",
           "fileName": "/music/community/Ozzy_Osbourne_-_Waiting_for_Darkness.mp3",
           "duration": "0:00",
@@ -165,7 +175,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 15,
+          "trackNumber": 16,
           "trackName": "Radiohead_-_Creep",
           "fileName": "/music/community/Radiohead_-_Creep.mp3",
           "duration": "0:00",
@@ -175,7 +185,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 16,
+          "trackNumber": 17,
           "trackName": "Sepultura_-_Symptom_of_the_Universe_-_2017_Remaster",
           "fileName": "/music/community/Sepultura_-_Symptom_of_the_Universe_-_2017_Remaster.mp3",
           "duration": "0:00",
@@ -185,7 +195,17 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 17,
+          "trackNumber": 18,
+          "trackName": "The_Architect_L_Entourloop_Skarra_Mucci_-_Dreader_Than_Dread",
+          "fileName": "/music/community/The_Architect_L_Entourloop_Skarra_Mucci_-_Dreader_Than_Dread.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 19,
           "trackName": "Vektor_-_Cosmic_Cortex",
           "fileName": "/music/community/Vektor_-_Cosmic_Cortex.mp3",
           "duration": "0:00",
@@ -195,7 +215,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 18,
+          "trackNumber": 20,
           "trackName": "Vektor_-_Echoless_Chamber",
           "fileName": "/music/community/Vektor_-_Echoless_Chamber.mp3",
           "duration": "0:00",
@@ -205,7 +225,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 19,
+          "trackNumber": 21,
           "trackName": "atarashii_gakko_-_tokyo_calling_official_music_video_",
           "fileName": "/music/community/atarashii_gakko_-_tokyo_calling_official_music_video_.mp3",
           "duration": "0:00",

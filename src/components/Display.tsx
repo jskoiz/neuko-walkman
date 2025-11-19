@@ -1,4 +1,5 @@
 import type { Track } from '../types/track';
+import { ScrollingText } from './ScrollingText';
 
 interface DisplayProps {
   currentTrack: Track | null;
@@ -11,6 +12,7 @@ interface DisplayProps {
   playlistName?: string;
   playlistIndex?: number;
   playlistTotal?: number;
+  loading?: boolean;
 }
 
 export function Display({
@@ -24,12 +26,13 @@ export function Display({
   playlistName,
   playlistIndex,
   playlistTotal,
+  loading = false,
 }: DisplayProps) {
   const trackNumber = currentTrack ? currentTrack.trackNumber : currentTrackIndex + 1;
   const displayFileName = currentTrack?.fileName || fileName;
   const fileNameOnly = displayFileName.split('/').pop() || displayFileName;
   const fileNameUpper = fileNameOnly.toUpperCase();
-  
+
   const currentPlaylistName = currentTrack?.playlistName || playlistName || '';
   const currentPlaylistIndex = currentTrack?.playlistIndex || playlistIndex || 1;
   const currentPlaylistTotal = currentTrack?.playlistTotal || playlistTotal || 1;
@@ -42,11 +45,20 @@ export function Display({
         </span>
         <span className="track-time">{formattedCurrentTime}</span>
       </div>
-      
-      <div className="display-line track-filename">{fileNameUpper}</div>
-      
+
+      <div className="display-line track-filename">
+        {loading ? (
+          <span className="loading-text">LOADING...</span>
+        ) : (
+          <ScrollingText text={fileNameUpper} />
+        )}
+      </div>
+
       <div className="display-line playlist-info">
-        <span className="playlist-name">PLAYLIST:[{currentPlaylistName.toUpperCase()}]</span>
+        <ScrollingText 
+          text={`PLAYLIST:[${currentPlaylistName.toUpperCase()}]`}
+          className="playlist-name"
+        />
       </div>
     </div>
   );

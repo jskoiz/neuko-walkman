@@ -12,6 +12,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { scanDreamHostFTP } from '../../utils/ftp-scanner';
+import { invalidatePlaylistCache } from '../../utils/playlist-cache';
 
 const execAsync = promisify(exec);
 
@@ -176,6 +177,9 @@ export const POST: APIRoute = async ({ request }) => {
     
     // Copy to public directory
     await copyPlaylistsToPublic();
+
+    // Invalidate cache so next request fetches fresh data
+    invalidatePlaylistCache();
 
     return new Response(
       JSON.stringify({ success: true, message: 'Playlists updated successfully' }),

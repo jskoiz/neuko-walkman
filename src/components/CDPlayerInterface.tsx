@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Track } from '../types/track';
 import { useAudioPlayer } from './AudioPlayer';
 import { Display } from './Display';
 import { ControlButtonArray } from './ControlButtonArray';
 import { PlaylistPanel } from './PlaylistPanel';
 import '../styles/cd-player.css';
+import { BUTTON_PRESS_TIMEOUT, ERROR_AUTO_DISMISS_TIME, KEYBOARD_SHORTCUTS } from '../constants';
 
 interface CDPlayerInterfaceProps {
   tracks: Track[];
@@ -14,7 +15,8 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
   const [buttonPressed, setButtonPressed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [panelVisible, setPanelVisible] = useState(false);
-  
+  const [panelExtended, setPanelExtended] = useState(false);
+
   const {
     currentTrack,
     currentTrackIndex,
@@ -39,6 +41,9 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
     formattedDuration,
     totalTracks,
     currentPlaylistTracks,
+    isLoading,
+    shuffleMode,
+    toggleShuffle,
   } = useAudioPlayer(tracks);
 
   const handleButtonClick = async (action: string, handler: () => void | Promise<void>) => {
@@ -48,10 +53,113 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
       await handler();
     } catch (err) {
       console.error('Button action error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      setError(errorMessage);
+      
+      // Auto-dismiss error after timeout
+      setTimeout(() => {
+        setError(null);
+      }, ERROR_AUTO_DISMISS_TIME);
     }
-    setTimeout(() => setButtonPressed(null), 150);
+    setTimeout(() => setButtonPressed(null), BUTTON_PRESS_TIMEOUT);
   };
+
+  const dismissError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement).isContentEditable
+      ) {
+        return;
+      }
+
+      // Prevent default for our shortcuts
+      if (
+        e.key === KEYBOARD_SHORTCUTS.SPACE ||
+        e.key === KEYBOARD_SHORTCUTS.ARROW_LEFT ||
+        e.key === KEYBOARD_SHORTCUTS.ARROW_RIGHT ||
+        e.key === KEYBOARD_SHORTCUTS.ARROW_UP ||
+        e.key === KEYBOARD_SHORTCUTS.ARROW_DOWN ||
+        e.key === KEYBOARD_SHORTCUTS.ENTER ||
+        e.key === KEYBOARD_SHORTCUTS.ESCAPE ||
+        e.key === KEYBOARD_SHORTCUTS.PLUS ||
+        e.key === KEYBOARD_SHORTCUTS.MINUS ||
+        e.key === KEYBOARD_SHORTCUTS.S ||
+        e.key === KEYBOARD_SHORTCUTS.S_UPPER
+      ) {
+        e.preventDefault();
+      }
+
+      switch (e.key) {
+        case KEYBOARD_SHORTCUTS.SPACE:
+          togglePlayPause();
+          break;
+        case KEYBOARD_SHORTCUTS.ARROW_LEFT:
+          if (e.shiftKey) {
+            previousPlaylist();
+          } else {
+            previousTrack();
+          }
+          break;
+        case KEYBOARD_SHORTCUTS.ARROW_RIGHT:
+          if (e.shiftKey) {
+            nextPlaylist();
+          } else {
+            nextTrack();
+          }
+          break;
+        case KEYBOARD_SHORTCUTS.ARROW_UP:
+          increaseVolume();
+          break;
+        case KEYBOARD_SHORTCUTS.ARROW_DOWN:
+          decreaseVolume();
+          break;
+        case KEYBOARD_SHORTCUTS.ESCAPE:
+          if (panelVisible) {
+            setPanelVisible(false);
+          }
+          if (error) {
+            dismissError();
+          }
+          break;
+        case KEYBOARD_SHORTCUTS.PLUS:
+        case '=':
+          increaseVolume();
+          break;
+        case KEYBOARD_SHORTCUTS.MINUS:
+          decreaseVolume();
+          break;
+        case KEYBOARD_SHORTCUTS.S:
+        case KEYBOARD_SHORTCUTS.S_UPPER:
+          toggleShuffle();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    togglePlayPause,
+    nextTrack,
+    previousTrack,
+    nextPlaylist,
+    previousPlaylist,
+    increaseVolume,
+    decreaseVolume,
+    panelVisible,
+    error,
+    dismissError,
+    toggleShuffle,
+  ]);
 
 
   if (tracks.length === 0) {
@@ -61,27 +169,27 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
   return (
     <div className="cd-player-container">
       {error && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(255, 0, 0, 0.9)',
-          color: 'white',
-          padding: '10px 20px',
-          borderRadius: '5px',
-          zIndex: 1000
-        }}>
-          Error: {error}
+        <div className="error-overlay">
+          <div className="error-content">
+            <span className="error-icon">!</span>
+            <span className="error-message">{error}</span>
+            <button
+              className="error-dismiss"
+              onClick={dismissError}
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
       <div className="cd-player-wrapper">
-        <img 
-          src="/walkman-hi-ref.png" 
-          alt="CD Walkman" 
+        <img
+          src="/walkman-hi-ref.png"
+          alt="CD Walkman"
           className="walkman-image"
         />
-        
+
         <div className="display-overlay">
           <Display
             currentTrack={currentTrack}
@@ -94,6 +202,7 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
             playlistName={currentTrack?.playlistName}
             playlistIndex={currentTrack?.playlistIndex}
             playlistTotal={currentTrack?.playlistTotal}
+            loading={isLoading}
           />
         </div>
 
@@ -158,33 +267,37 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
           </div>
         </div>
       </div>
-      
+
       <div className="button-array-container">
-        <ControlButtonArray
-          isPlaying={isPlaying}
-          isPaused={isPaused}
-          onPlayPause={() => handleButtonClick('play-pause', togglePlayPause)}
-          onStop={() => handleButtonClick('stop', stop)}
-          onPreviousTrack={() => handleButtonClick('previous', previousTrack)}
-          onNextTrack={() => handleButtonClick('next', nextTrack)}
-          onVolumeUp={() => handleButtonClick('volume-up', increaseVolume)}
-          onVolumeDown={() => handleButtonClick('volume-down', decreaseVolume)}
-          onPreviousPlaylist={() => handleButtonClick('playlist-previous', previousPlaylist)}
-          onNextPlaylist={() => handleButtonClick('playlist-next', nextPlaylist)}
-          onTogglePlaylist={() => setPanelVisible(!panelVisible)}
-          isPlaylistVisible={panelVisible}
-        />
-        <PlaylistPanel
-          currentPlaylistName={currentPlaylistName}
-          currentPlaylistTracks={currentPlaylistTracks}
-          currentTrackIndex={currentTrackIndex}
-          onTrackSelect={async (index) => {
-            selectTrack(index);
-            // Auto-play the selected track
-            await play();
-          }}
-          isVisible={panelVisible}
-        />
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <ControlButtonArray
+            isPlaying={isPlaying}
+            isPaused={isPaused}
+            onPlayPause={() => handleButtonClick('play-pause', togglePlayPause)}
+            onPause={() => handleButtonClick('pause', pause)}
+            onPreviousTrack={() => handleButtonClick('previous', previousTrack)}
+            onNextTrack={() => handleButtonClick('next', nextTrack)}
+            onVolumeUp={() => handleButtonClick('volume-up', increaseVolume)}
+            onVolumeDown={() => handleButtonClick('volume-down', decreaseVolume)}
+            onPreviousPlaylist={() => handleButtonClick('playlist-previous', previousPlaylist)}
+            onNextPlaylist={() => handleButtonClick('playlist-next', nextPlaylist)}
+            onTogglePlaylist={() => setPanelVisible(!panelVisible)}
+            isPlaylistVisible={panelVisible}
+          />
+          <PlaylistPanel
+            currentPlaylistName={currentPlaylistName}
+            currentPlaylistTracks={currentPlaylistTracks}
+            currentTrackIndex={currentTrackIndex}
+            onTrackSelect={async (index) => {
+              selectTrack(index);
+              // Auto-play the selected track
+              await play();
+            }}
+            isVisible={panelVisible}
+            isExtended={panelExtended}
+            onToggleExtended={() => setPanelExtended(!panelExtended)}
+          />
+        </div>
       </div>
     </div>
   );

@@ -2,6 +2,8 @@
  * Telegram Bot API helper functions
  */
 
+import { TELEGRAM_API_URL as TELEGRAM_API_URL_CONST, MAX_BUTTONS_PER_MESSAGE, MAX_TRACK_NAME_LENGTH, TRACK_NAME_TRUNCATE_LENGTH, DEFAULT_SITE_URL, MAX_PLAYLIST_NAME_LENGTH, MIN_PLAYLIST_NAME_LENGTH } from '../constants';
+
 export interface TelegramMessage {
   message_id: number;
   from?: {
@@ -36,7 +38,7 @@ export interface TelegramUpdate {
   callback_query?: TelegramCallbackQuery;
 }
 
-const TELEGRAM_API_URL = 'https://api.telegram.org/bot';
+const TELEGRAM_API_URL = TELEGRAM_API_URL_CONST;
 
 /**
  * Send a message to a Telegram chat
@@ -48,7 +50,7 @@ export async function sendMessage(
   replyMarkup?: any
 ): Promise<void> {
   const url = `${TELEGRAM_API_URL}${botToken}/sendMessage`;
-  
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -77,7 +79,7 @@ export async function answerCallbackQuery(
   text?: string
 ): Promise<void> {
   const url = `${TELEGRAM_API_URL}${botToken}/answerCallbackQuery`;
-  
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -106,7 +108,7 @@ export async function editMessageText(
   replyMarkup?: any
 ): Promise<void> {
   const url = `${TELEGRAM_API_URL}${botToken}/editMessageText`;
-  
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -136,7 +138,7 @@ export async function deleteMessage(
   messageId: number
 ): Promise<void> {
   const url = `${TELEGRAM_API_URL}${botToken}/deleteMessage`;
-  
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -170,10 +172,10 @@ export async function sendPhoto(
   replyMarkup?: any
 ): Promise<void> {
   const url = `${TELEGRAM_API_URL}${botToken}/sendPhoto`;
-  
+
   // Check if photo is a Buffer (more reliable than typeof check)
   const isBuffer = Buffer.isBuffer(photo);
-  
+
   // If photo is a URL string, send it directly
   if (!isBuffer && typeof photo === 'string') {
     const response = await fetch(url, {
@@ -201,15 +203,15 @@ export async function sendPhoto(
     const FormData = FormDataModule.default;
     const https = await import('https');
     const { URL } = await import('url');
-    
+
     const form = new FormData();
-    
+
     form.append('chat_id', chatId.toString());
     form.append('photo', photo, {
       filename: 'vending-machines.jpg',
       contentType: 'image/jpeg',
     });
-    
+
     if (caption) {
       form.append('caption', caption);
     }
@@ -222,7 +224,7 @@ export async function sendPhoto(
 
     // Parse URL and make request with https module
     const parsedUrl = new URL(url);
-    
+
     return new Promise<void>((resolve, reject) => {
       const req = https.request(
         {
@@ -298,12 +300,12 @@ export function isValidSongUrl(url: string): boolean {
  */
 export function isAdmin(userId: number): boolean {
   let adminIdsEnv: string | undefined;
-  
+
   // Check process.env first (Node.js context)
   if (typeof process !== 'undefined' && process.env) {
     adminIdsEnv = process.env.TELEGRAM_ADMIN_IDS;
   }
-  
+
   // Fallback to import.meta.env (Astro context) if process.env didn't have it
   if (!adminIdsEnv) {
     try {
@@ -315,18 +317,18 @@ export function isAdmin(userId: number): boolean {
       // import.meta not available, that's okay
     }
   }
-  
+
   if (!adminIdsEnv) {
     return false;
   }
-  
+
   const adminIds = adminIdsEnv
     .split(',')
     .map(id => id.trim())
     .filter(id => id.length > 0)
     .map(id => parseInt(id, 10))
     .filter(id => !isNaN(id));
-  
+
   return adminIds.includes(userId);
 }
 
@@ -337,12 +339,12 @@ export function isAdmin(userId: number): boolean {
 export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
   // Try to get baseUrl from various sources
   let baseUrl: string | undefined;
-  
+
   // Check process.env first (Node.js context)
   if (typeof process !== 'undefined' && process.env) {
     baseUrl = siteUrl || process.env.PUBLIC_SITE_URL;
   }
-  
+
   // Fallback to import.meta.env (Astro context)
   if (!baseUrl) {
     try {
@@ -353,14 +355,14 @@ export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
       // import.meta not available
     }
   }
-  
+
   // Default fallback
   if (!baseUrl) {
-    baseUrl = siteUrl || 'http://localhost:4321';
+    baseUrl = siteUrl || DEFAULT_SITE_URL;
   }
-  
+
   const url = `${baseUrl}/api/playlists.json`;
-  
+
   try {
     const response = await fetch(url);
     if (!response.ok) {
@@ -375,7 +377,7 @@ export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
       if (typeof process !== 'undefined' && process.env) {
         const fs = await import('fs/promises');
         const path = await import('path');
-        
+
         // Try to find the playlists.json file
         let playlistsPath: string;
         try {
@@ -396,7 +398,7 @@ export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
       // Only log if local file read also failed (actual error)
       console.error('Error reading local playlists file:', fileError);
     }
-    
+
     // Only log as error if we're in a context where local file fallback isn't available
     if (typeof process === 'undefined' || !process.env) {
       console.error('Error fetching playlists (no local file fallback available):', error);
@@ -410,7 +412,7 @@ export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
  */
 export function validatePlaylistName(name: string): boolean {
   // Prevent path traversal and invalid characters
-  if (!name || name.length === 0 || name.length > 100) {
+  if (!name || name.length < MIN_PLAYLIST_NAME_LENGTH || name.length > MAX_PLAYLIST_NAME_LENGTH) {
     return false;
   }
   // Check for path traversal attempts

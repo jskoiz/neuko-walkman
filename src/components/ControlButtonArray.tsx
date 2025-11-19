@@ -1,12 +1,11 @@
 import React from 'react';
 import { 
   Volume2, 
-  VolumeX, 
+  Volume1,
   ChevronLeft, 
   ChevronRight, 
   Play, 
   Pause, 
-  Square,
   SkipBack,
   SkipForward
 } from 'lucide-react';
@@ -15,7 +14,7 @@ interface ControlButtonArrayProps {
   isPlaying: boolean;
   isPaused: boolean;
   onPlayPause: () => void;
-  onStop: () => void;
+  onPause: () => void;
   onPreviousTrack: () => void;
   onNextTrack: () => void;
   onVolumeUp: () => void;
@@ -30,7 +29,7 @@ export function ControlButtonArray({
   isPlaying,
   isPaused,
   onPlayPause,
-  onStop,
+  onPause,
   onPreviousTrack,
   onNextTrack,
   onVolumeUp,
@@ -50,14 +49,21 @@ export function ControlButtonArray({
     borderRadius: '6px',
     border: '1px solid #BFBFBF',
     boxShadow: '#BFBFBF 2px 2px 0px 0px',
-    transition: 'opacity 0.2s ease',
+    transition: 'all 0.2s ease',
     backgroundColor: '#ffffff',
     padding: 0,
     position: 'relative',
   };
 
   const buttonHoverStyle: React.CSSProperties = {
-    opacity: 0.8,
+    opacity: 0.9,
+    transform: 'translateY(-1px)',
+    boxShadow: '#BFBFBF 3px 3px 0px 0px',
+  };
+
+  const buttonActiveStyle: React.CSSProperties = {
+    transform: 'translateY(1px)',
+    boxShadow: '#BFBFBF 1px 1px 0px 0px',
   };
 
   const tooltipStyle: React.CSSProperties = {
@@ -115,9 +121,17 @@ export function ControlButtonArray({
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.removeProperty('opacity');
+            e.currentTarget.style.removeProperty('transform');
+            e.currentTarget.style.removeProperty('box-shadow');
             if (!(isPlaying && !isPaused && customStyle?.backgroundColor === '#e0e0e0')) {
               e.currentTarget.style.backgroundColor = '#ffffff';
             }
+          }}
+          onMouseDown={(e) => {
+            Object.assign(e.currentTarget.style, buttonActiveStyle);
+          }}
+          onMouseUp={(e) => {
+            Object.assign(e.currentTarget.style, buttonHoverStyle);
           }}
           onClick={onClick}
           aria-label={ariaLabel}
@@ -137,24 +151,37 @@ export function ControlButtonArray({
     );
   };
 
+  // Calculate height for tall playlist toggle button to match 4 rows
+  // 4 rows * 35px + 3 gaps * 4px = 140px + 12px = 152px
+  const playlistToggleButtonHeight = 35 * 4 + 4 * 3; // 152px
+
   return (
-    <div className="control-button-array">
-      <div className="button-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, auto)', gap: '4px', padding: 0, width: 'fit-content' }}>
-        {/* Row 1: Playlist controls */}
+    <div className="control-button-array" style={{ display: 'flex', gap: '4px', alignItems: 'flex-start' }}>
+      <div className="button-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, auto)', gridTemplateRows: 'repeat(4, auto)', gap: '4px', padding: 0, width: 'fit-content' }}>
+        {/* Row 1: Track navigation */}
+        <ButtonWithTooltip
+          onClick={onPreviousTrack}
+          ariaLabel="Previous Track"
+          tooltip="Previous Track"
+        >
+          <ChevronLeft size={20} color={getIconColor()} />
+        </ButtonWithTooltip>
+        
+        <ButtonWithTooltip
+          onClick={onNextTrack}
+          ariaLabel="Next Track"
+          tooltip="Next Track"
+        >
+          <ChevronRight size={20} color={getIconColor()} />
+        </ButtonWithTooltip>
+
+        {/* Row 2: Playlist navigation */}
         <ButtonWithTooltip
           onClick={onPreviousPlaylist}
           ariaLabel="Previous Playlist"
           tooltip="Previous Playlist"
         >
           <SkipBack size={16} color={getIconColor()} />
-        </ButtonWithTooltip>
-        
-        <ButtonWithTooltip
-          onClick={onStop}
-          ariaLabel="Stop"
-          tooltip="Stop"
-        >
-          <Square size={16} color={getIconColor()} />
         </ButtonWithTooltip>
         
         <ButtonWithTooltip
@@ -165,13 +192,16 @@ export function ControlButtonArray({
           <SkipForward size={16} color={getIconColor()} />
         </ButtonWithTooltip>
 
-        {/* Row 2: Track controls */}
+        {/* Row 3: Playback controls */}
         <ButtonWithTooltip
-          onClick={onPreviousTrack}
-          ariaLabel="Previous Track"
-          tooltip="Previous Track"
+          onClick={onPause}
+          ariaLabel="Pause"
+          tooltip="Pause"
+          customStyle={{
+            backgroundColor: isPaused ? '#e0e0e0' : '#ffffff',
+          }}
         >
-          <ChevronLeft size={20} color={getIconColor()} />
+          <Pause size={16} color={getIconColor()} fill={isPaused ? getIconColor() : 'none'} />
         </ButtonWithTooltip>
         
         <ButtonWithTooltip
@@ -188,34 +218,14 @@ export function ControlButtonArray({
             <Play size={16} color={getIconColor()} fill={getIconColor()} />
           )}
         </ButtonWithTooltip>
-        
-        <ButtonWithTooltip
-          onClick={onNextTrack}
-          ariaLabel="Next Track"
-          tooltip="Next Track"
-        >
-          <ChevronRight size={20} color={getIconColor()} />
-        </ButtonWithTooltip>
 
-        {/* Row 3: Volume controls */}
+        {/* Row 4: Volume controls */}
         <ButtonWithTooltip
           onClick={onVolumeDown}
           ariaLabel="Volume Down"
           tooltip="Volume Down"
         >
-          <VolumeX size={16} color={getIconColor()} />
-        </ButtonWithTooltip>
-        
-        <ButtonWithTooltip
-          onClick={onTogglePlaylist}
-          ariaLabel={isPlaylistVisible ? 'Hide Playlist' : 'Show Playlist'}
-          tooltip={isPlaylistVisible ? 'Hide Playlist' : 'Show Playlist'}
-        >
-          {isPlaylistVisible ? (
-            <ChevronRight size={16} color={getIconColor()} />
-          ) : (
-            <ChevronLeft size={16} color={getIconColor()} />
-          )}
+          <Volume1 size={16} color={getIconColor()} />
         </ButtonWithTooltip>
         
         <ButtonWithTooltip
@@ -226,6 +236,23 @@ export function ControlButtonArray({
           <Volume2 size={16} color={getIconColor()} />
         </ButtonWithTooltip>
       </div>
+      
+      {/* Tall thin playlist toggle button */}
+      <ButtonWithTooltip
+        onClick={onTogglePlaylist}
+        ariaLabel={isPlaylistVisible ? 'Hide Playlist' : 'Show Playlist'}
+        tooltip={isPlaylistVisible ? 'Hide Playlist' : 'Show Playlist'}
+        customStyle={{
+          height: `${playlistToggleButtonHeight}px`,
+          width: '24px',
+        }}
+      >
+        {isPlaylistVisible ? (
+          <ChevronRight size={14} color={getIconColor()} />
+        ) : (
+          <ChevronLeft size={14} color={getIconColor()} />
+        )}
+      </ButtonWithTooltip>
     </div>
   );
 }
