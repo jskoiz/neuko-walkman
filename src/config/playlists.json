@@ -26,6 +26,66 @@
       "tracks": [
         {
           "trackNumber": 1,
+          "trackName": "Alice_In_Chains_-_Rain_When_I_Die_2022_Remaster_",
+          "fileName": "/music/community/Alice_In_Chains_-_Rain_When_I_Die_2022_Remaster_.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 2,
+          "trackName": "Avicii_-_Levels_-_Radio_Edit",
+          "fileName": "/music/community/Avicii_-_Levels_-_Radio_Edit.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 3,
+          "trackName": "Avicii_-_Waiting_For_Love",
+          "fileName": "/music/community/Avicii_-_Waiting_For_Love.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 4,
+          "trackName": "Daft_Punk_-_Around_the_World",
+          "fileName": "/music/community/Daft_Punk_-_Around_the_World.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 5,
+          "trackName": "Daft_Punk_-_Harder_Better_Faster_Stronger",
+          "fileName": "/music/community/Daft_Punk_-_Harder_Better_Faster_Stronger.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 6,
+          "trackName": "Dream_Theater_-_Pull_Me_Under",
+          "fileName": "/music/community/Dream_Theater_-_Pull_Me_Under.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 7,
           "trackName": "Frank_Ocean_-_White_Ferrari",
           "fileName": "/music/community/Frank_Ocean_-_White_Ferrari.mp3",
           "duration": "0:00",
@@ -35,7 +95,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 2,
+          "trackNumber": 8,
           "trackName": "Jamie_s_Elsewhere_-_Traveler_OFFICIAL_MUSIC_VIDEO_",
           "fileName": "/music/community/Jamie_s_Elsewhere_-_Traveler_OFFICIAL_MUSIC_VIDEO_.mp3",
           "duration": "0:00",
@@ -45,7 +105,17 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 3,
+          "trackNumber": 9,
+          "trackName": "Juice_WRLD_-_Lucid_Dreams",
+          "fileName": "/music/community/Juice_WRLD_-_Lucid_Dreams.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 10,
           "trackName": "Massive_Attack_-_Unfinished_Sympathy",
           "fileName": "/music/community/Massive_Attack_-_Unfinished_Sympathy.mp3",
           "duration": "0:00",
@@ -55,7 +125,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 4,
+          "trackNumber": 11,
           "trackName": "Oasis_-_Wonderwall_Official_Video_",
           "fileName": "/music/community/Oasis_-_Wonderwall_Official_Video_.mp3",
           "duration": "0:00",
@@ -65,7 +135,57 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 5,
+          "trackNumber": 12,
+          "trackName": "Owl_City_-_Fireflies",
+          "fileName": "/music/community/Owl_City_-_Fireflies.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 13,
+          "trackName": "Ozzy_Osbourne_-_Believer",
+          "fileName": "/music/community/Ozzy_Osbourne_-_Believer.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 14,
+          "trackName": "Ozzy_Osbourne_-_Waiting_for_Darkness",
+          "fileName": "/music/community/Ozzy_Osbourne_-_Waiting_for_Darkness.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 15,
+          "trackName": "Radiohead_-_Creep",
+          "fileName": "/music/community/Radiohead_-_Creep.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 16,
+          "trackName": "Sepultura_-_Symptom_of_the_Universe_-_2017_Remaster",
+          "fileName": "/music/community/Sepultura_-_Symptom_of_the_Universe_-_2017_Remaster.mp3",
+          "duration": "0:00",
+          "playlistName": "community",
+          "playlistIndex": 2,
+          "playlistTotal": 6,
+          "playlistPath": "/music/community"
+        },
+        {
+          "trackNumber": 17,
           "trackName": "Vektor_-_Cosmic_Cortex",
           "fileName": "/music/community/Vektor_-_Cosmic_Cortex.mp3",
           "duration": "0:00",
@@ -75,7 +195,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 6,
+          "trackNumber": 18,
           "trackName": "Vektor_-_Echoless_Chamber",
           "fileName": "/music/community/Vektor_-_Echoless_Chamber.mp3",
           "duration": "0:00",
@@ -85,7 +205,7 @@
           "playlistPath": "/music/community"
         },
         {
-          "trackNumber": 7,
+          "trackNumber": 19,
           "trackName": "atarashii_gakko_-_tokyo_calling_official_music_video_",
           "fileName": "/music/community/atarashii_gakko_-_tokyo_calling_official_music_video_.mp3",
           "duration": "0:00",

@@ -63,7 +63,7 @@ function logBotActivity(entry: LogEntry): void {
 
 const TELEGRAM_API_URL = 'https://api.telegram.org/bot';
 const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
-const RATE_LIMIT_REQUESTS = 5;
+const RATE_LIMIT_REQUESTS = 10; // Increased from 5 to 10 requests per minute
 const RATE_LIMIT_WINDOW = 60 * 1000;
 
 // User session state interface
@@ -233,7 +233,7 @@ async function processSongSubmission(chatId: number, url: string, playlistName?:
   });
 
   try {
-    // Check rate limit
+    // Check rate limit for song submissions (already checked in handleMessage, but double-check here)
     const userIdStr = chatId.toString();
     if (!checkRateLimit(userIdStr, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW)) {
       const resetTime = getResetTime(userIdStr);
@@ -382,14 +382,19 @@ async function processSongSubmission(chatId: number, url: string, playlistName?:
   } catch (error: any) {
     let errorMessage = error.message || 'An unknown error occurred';
     
-    if (errorMessage.includes('File too large')) {
+    // Handle network/fetch errors
+    if (errorMessage.includes('fetch failed') || errorMessage.includes('ECONNRESET') || errorMessage.includes('ETIMEDOUT') || errorMessage.includes('ENOTFOUND')) {
+      errorMessage = 'Network error occurred. Please check your internet connection and try again.';
+    } else if (errorMessage.includes('File too large')) {
       errorMessage = 'The song file is too large. Please try a shorter song or a different link.';
-    } else if (errorMessage.includes('timeout')) {
-      errorMessage = 'The download timed out. Please try again in a few moments.';
-    } else if (errorMessage.includes('No MP3 file found')) {
+    } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+      errorMessage = 'The download timed out. The song may be too long or the service is busy. Please try again.';
+    } else if (errorMessage.includes('No MP3 file found') || errorMessage.includes('Download failed')) {
       errorMessage = 'Could not download the song. Please check that the URL is valid and the song is available.';
-    } else if (errorMessage.includes('FTP')) {
+    } else if (errorMessage.includes('FTP') || errorMessage.includes('SFTP')) {
       errorMessage = 'Failed to upload the song. Please contact support if this persists.';
+    } else if (errorMessage.includes('command not found') || errorMessage.includes('ENOENT')) {
+      errorMessage = 'Download service is not available. Please contact support.';
     }
     
     await sendMessage(
@@ -1000,23 +1005,29 @@ async function handleMessage(message: any): Promise<void> {
 
   if (!text) return;
 
-  const userIdStr = chatId.toString();
-  if (!checkRateLimit(userIdStr, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW)) {
-    const resetTime = getResetTime(userIdStr);
-    const waitSeconds = resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : 60;
-    
-    logBotActivity({
-      timestamp: new Date().toISOString(),
-      userId,
-      username,
-      chatId,
-      action: 'RATE_LIMIT_EXCEEDED',
-      details: { waitSeconds, message: text.substring(0, 50) },
-      status: 'info',
-    });
-    
-    await sendMessage(botToken, chatId, `⏳ Rate limit exceeded. Please wait ${waitSeconds} seconds before trying again.`);
-    return;
+  // Check if this is a command (should not be rate limited)
+  const isCommand = text.startsWith('/start') || text.startsWith('/playlists');
+  
+  // Only check rate limit for non-command messages
+  if (!isCommand) {
+    const userIdStr = chatId.toString();
+    if (!checkRateLimit(userIdStr, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW)) {
+      const resetTime = getResetTime(userIdStr);
+      const waitSeconds = resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : 60;
+      
+      logBotActivity({
+        timestamp: new Date().toISOString(),
+        userId,
+        username,
+        chatId,
+        action: 'RATE_LIMIT_EXCEEDED',
+        details: { waitSeconds, message: text.substring(0, 50) },
+        status: 'info',
+      });
+      
+      await sendMessage(botToken, chatId, `⏳ Rate limit exceeded. Please wait ${waitSeconds} seconds before trying again.`);
+      return;
+    }
   }
 
   const session = userSessions.get(chatId);

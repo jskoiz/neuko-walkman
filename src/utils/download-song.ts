@@ -386,13 +386,22 @@ export async function downloadSongAsBuffer(
     } catch {}
 
     // Provide user-friendly error messages
-    if (error.message.includes('timeout')) {
+    const errorMessage = error.message || String(error);
+    
+    if (errorMessage.includes('fetch failed') || errorMessage.includes('ECONNRESET') || errorMessage.includes('ETIMEDOUT') || errorMessage.includes('ENOTFOUND')) {
+      throw new Error('Network error occurred while downloading. Please check your internet connection and try again.');
+    }
+    if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
       throw new Error('Download timed out. The song may be too long or the service is busy. Please try again.');
     }
-    if (error.message.includes('ENOENT') || error.message.includes('command not found')) {
-      throw new Error('spotify-dl is not installed or not in PATH. Please contact the administrator.');
+    if (errorMessage.includes('ENOENT') || errorMessage.includes('command not found')) {
+      throw new Error('Download service is not available. Please contact the administrator.');
+    }
+    if (errorMessage.includes('No MP3 file found') || errorMessage.includes('Download failed')) {
+      throw new Error('Could not download the song. Please check that the URL is valid and the song is available.');
     }
     
+    // Re-throw with original message if no specific handler matched
     throw error;
   }
 }
