@@ -24,6 +24,14 @@ export function PlaylistPanel({
   const [focusedIndex, setFocusedIndex] = useState(currentTrackIndex);
   const trackRefs = useRef<(HTMLDivElement | null)[]>([]);
   
+  // Detect mobile viewport - must be declared before use
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768;
+    }
+    return false;
+  });
+  
   // Calculate height to match 4 rows of buttons (35px each) + gaps (4px * 3)
   // Button grid height: 35 * 4 + 4 * 3 = 152px
   // Extended height: allow more tracks to be visible, but respect viewport
@@ -62,7 +70,9 @@ export function PlaylistPanel({
   }, [basePanelHeight]);
   
   const extendedPanelHeight = isExtended ? maxHeight : basePanelHeight;
-  const panelHeight = Math.min(extendedPanelHeight, maxHeight);
+  const panelHeight = isMobile 
+    ? undefined // Let it expand naturally on mobile
+    : Math.min(extendedPanelHeight, maxHeight);
 
   // Sync focused index with current track
   useEffect(() => {
@@ -117,22 +127,52 @@ export function PlaylistPanel({
     };
   }, [isVisible, focusedIndex, currentPlaylistTracks.length, onTrackSelect]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleResize = () => {
+        setIsMobile(window.innerWidth <= 768);
+      };
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
+
+  // Calculate mobile max height to prevent going off screen
+  const mobileMaxHeight = isMobile && typeof window !== 'undefined'
+    ? Math.min(window.innerHeight * 0.5, 400) // Use 50% of viewport or 400px max
+    : undefined;
+
   const panelStyle: React.CSSProperties = {
-    width: '280px',
-    height: `${panelHeight}px`,
+    width: isMobile ? '100%' : '280px',
+    maxWidth: isMobile ? '100%' : '280px',
+    height: isMobile ? 'auto' : `${panelHeight}px`,
+    maxHeight: isMobile ? `${mobileMaxHeight}px` : `${maxHeight}px`,
     backgroundColor: '#ffffff',
     border: '1px solid #BFBFBF',
     boxShadow: '#BFBFBF 2px 2px 0px 0px',
     borderRadius: '6px',
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden',
-    transition: 'height 0.3s ease',
-    position: 'absolute',
-    left: '100%',
-    marginLeft: '4px',
-    top: 0,
-    maxHeight: `${maxHeight}px`, // Use calculated max height
+    overflow: 'hidden', // Keep hidden to contain the scrollable track list
+    transition: isMobile ? 'none' : 'height 0.3s ease',
+    position: isMobile ? 'relative' : 'absolute',
+    ...(isMobile 
+      ? {
+          left: 'auto',
+          right: 'auto',
+          transform: 'none',
+          top: 'auto',
+          marginTop: '4px',
+          marginLeft: 0,
+          marginRight: 0,
+          marginBottom: '1rem',
+        }
+      : {
+          left: '100%',
+          marginLeft: '4px',
+          top: 0,
+        }
+    ),
   };
 
   const headerStyle: React.CSSProperties = {
@@ -143,7 +183,7 @@ export function PlaylistPanel({
     justifyContent: 'space-between',
     alignItems: 'center',
     minHeight: '20px',
-    cursor: onToggleExtended ? 'pointer' : 'default',
+    cursor: !isMobile && onToggleExtended ? 'pointer' : 'default',
     userSelect: 'none',
   };
 
@@ -199,6 +239,12 @@ export function PlaylistPanel({
     flexDirection: 'column',
     gap: '4px',
     minHeight: 0, // Important for flex scrolling
+    // Hide scrollbar on mobile for cleaner look, but still allow scrolling
+    ...(isMobile ? {
+      scrollbarWidth: 'none', // Firefox
+      msOverflowStyle: 'none', // IE/Edge
+      WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+    } : {}),
   };
 
   const trackItemStyle = (isCurrent: boolean): React.CSSProperties => ({
@@ -231,7 +277,8 @@ export function PlaylistPanel({
     whiteSpace: 'nowrap',
   };
 
-  if (!isVisible) {
+  // Always show on mobile, respect isVisible on desktop
+  if (!isMobile && !isVisible) {
     return null;
   }
 
@@ -242,20 +289,20 @@ export function PlaylistPanel({
     <div style={panelStyle}>
         <div 
           style={headerStyle}
-          onClick={onToggleExtended}
+          onClick={isMobile ? undefined : onToggleExtended}
           onMouseEnter={(e) => {
-            if (onToggleExtended) {
+            if (!isMobile && onToggleExtended) {
               e.currentTarget.style.backgroundColor = '#e8e8e8';
             }
           }}
           onMouseLeave={(e) => {
-            if (onToggleExtended) {
+            if (!isMobile && onToggleExtended) {
               e.currentTarget.style.backgroundColor = '#f5f5f5';
             }
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {onToggleExtended && (
+            {!isMobile && onToggleExtended && (
               <div 
                 style={dragHandleStyle}
                 onMouseEnter={(e) => {
@@ -288,7 +335,10 @@ export function PlaylistPanel({
           )}
         </div>
         
-        <div style={trackListStyle}>
+        <div 
+          style={trackListStyle}
+          className={isMobile ? 'playlist-track-list-mobile' : ''}
+        >
           {currentPlaylistTracks.length === 0 ? (
             <div style={{ padding: '10px', color: '#666666', textAlign: 'center', fontSize: '12px' }}>
               No tracks

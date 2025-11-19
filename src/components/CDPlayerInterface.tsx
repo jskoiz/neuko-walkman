@@ -14,8 +14,38 @@ interface CDPlayerInterfaceProps {
 export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
   const [buttonPressed, setButtonPressed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [panelVisible, setPanelVisible] = useState(false);
+  
+  // Detect mobile and set panel visible by default on mobile
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768;
+    }
+    return false;
+  });
+  
+  const [panelVisible, setPanelVisible] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768; // Visible by default on mobile
+    }
+    return false;
+  });
   const [panelExtended, setPanelExtended] = useState(false);
+  
+  // Update mobile state on resize
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleResize = () => {
+        const mobile = window.innerWidth <= 768;
+        setIsMobile(mobile);
+        // On mobile, always keep panel visible
+        if (mobile) {
+          setPanelVisible(true);
+        }
+      };
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
 
   const {
     currentTrack,
@@ -122,7 +152,8 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
           decreaseVolume();
           break;
         case KEYBOARD_SHORTCUTS.ESCAPE:
-          if (panelVisible) {
+          // Don't close panel on mobile - it's always visible
+          if (!isMobile && panelVisible) {
             setPanelVisible(false);
           }
           if (error) {
@@ -159,6 +190,7 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
     error,
     dismissError,
     toggleShuffle,
+    isMobile,
   ]);
 
 
@@ -269,7 +301,13 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
       </div>
 
       <div className="button-array-container">
-        <div style={{ position: 'relative', display: 'inline-block' }}>
+        <div style={{ 
+          position: 'relative', 
+          display: isMobile ? 'flex' : 'inline-block',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'center' : 'flex-start',
+          width: isMobile ? '100%' : 'auto',
+        }}>
           <ControlButtonArray
             isPlaying={isPlaying}
             isPaused={isPaused}
@@ -281,8 +319,14 @@ export function CDPlayerInterface({ tracks }: CDPlayerInterfaceProps) {
             onVolumeDown={() => handleButtonClick('volume-down', decreaseVolume)}
             onPreviousPlaylist={() => handleButtonClick('playlist-previous', previousPlaylist)}
             onNextPlaylist={() => handleButtonClick('playlist-next', nextPlaylist)}
-            onTogglePlaylist={() => setPanelVisible(!panelVisible)}
+            onTogglePlaylist={() => {
+              // Don't toggle on mobile - panel is always visible
+              if (!isMobile) {
+                setPanelVisible(!panelVisible);
+              }
+            }}
             isPlaylistVisible={panelVisible}
+            isMobile={isMobile}
           />
           <PlaylistPanel
             currentPlaylistName={currentPlaylistName}

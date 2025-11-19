@@ -23,6 +23,7 @@ interface ControlButtonArrayProps {
   onNextPlaylist: () => void;
   onTogglePlaylist: () => void;
   isPlaylistVisible: boolean;
+  isMobile?: boolean;
 }
 
 export function ControlButtonArray({
@@ -38,6 +39,7 @@ export function ControlButtonArray({
   onNextPlaylist,
   onTogglePlaylist,
   isPlaylistVisible,
+  isMobile = false,
 }: ControlButtonArrayProps) {
   const buttonStyle: React.CSSProperties = {
     height: '35px',
@@ -155,10 +157,29 @@ export function ControlButtonArray({
   // 4 rows * 35px + 3 gaps * 4px = 140px + 12px = 152px
   const playlistToggleButtonHeight = 35 * 4 + 4 * 3; // 152px
 
+  // Mobile: single row of 8 buttons, Desktop: 2x4 grid
+  const buttonContainerStyle: React.CSSProperties = isMobile
+    ? {
+        display: 'flex',
+        flexDirection: 'row',
+        gap: '4px',
+        width: '100%',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+      }
+    : {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, auto)',
+        gridTemplateRows: 'repeat(4, auto)',
+        gap: '4px',
+        padding: 0,
+        width: 'fit-content',
+      };
+
   return (
-    <div className="control-button-array" style={{ display: 'flex', gap: '4px', alignItems: 'flex-start' }}>
-      <div className="button-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, auto)', gridTemplateRows: 'repeat(4, auto)', gap: '4px', padding: 0, width: 'fit-content' }}>
-        {/* Row 1: Track navigation */}
+    <div className="control-button-array" style={{ display: 'flex', gap: '4px', alignItems: 'flex-start', width: isMobile ? '100%' : 'auto' }}>
+      <div className="button-grid" style={buttonContainerStyle}>
+        {/* Button 1: Previous Track */}
         <ButtonWithTooltip
           onClick={onPreviousTrack}
           ariaLabel="Previous Track"
@@ -167,6 +188,7 @@ export function ControlButtonArray({
           <ChevronLeft size={20} color={getIconColor()} />
         </ButtonWithTooltip>
         
+        {/* Button 2: Next Track */}
         <ButtonWithTooltip
           onClick={onNextTrack}
           ariaLabel="Next Track"
@@ -175,7 +197,7 @@ export function ControlButtonArray({
           <ChevronRight size={20} color={getIconColor()} />
         </ButtonWithTooltip>
 
-        {/* Row 2: Playlist navigation */}
+        {/* Button 3: Previous Playlist */}
         <ButtonWithTooltip
           onClick={onPreviousPlaylist}
           ariaLabel="Previous Playlist"
@@ -184,6 +206,7 @@ export function ControlButtonArray({
           <SkipBack size={16} color={getIconColor()} />
         </ButtonWithTooltip>
         
+        {/* Button 4: Next Playlist */}
         <ButtonWithTooltip
           onClick={onNextPlaylist}
           ariaLabel="Next Playlist"
@@ -192,7 +215,7 @@ export function ControlButtonArray({
           <SkipForward size={16} color={getIconColor()} />
         </ButtonWithTooltip>
 
-        {/* Row 3: Playback controls */}
+        {/* Button 5: Pause */}
         <ButtonWithTooltip
           onClick={onPause}
           ariaLabel="Pause"
@@ -204,6 +227,7 @@ export function ControlButtonArray({
           <Pause size={16} color={getIconColor()} fill={isPaused ? getIconColor() : 'none'} />
         </ButtonWithTooltip>
         
+        {/* Button 6: Play/Pause */}
         <ButtonWithTooltip
           onClick={onPlayPause}
           ariaLabel={isPlaying && !isPaused ? 'Pause' : 'Play'}
@@ -219,7 +243,7 @@ export function ControlButtonArray({
           )}
         </ButtonWithTooltip>
 
-        {/* Row 4: Volume controls */}
+        {/* Button 7: Volume Down */}
         <ButtonWithTooltip
           onClick={onVolumeDown}
           ariaLabel="Volume Down"
@@ -228,6 +252,7 @@ export function ControlButtonArray({
           <Volume1 size={16} color={getIconColor()} />
         </ButtonWithTooltip>
         
+        {/* Button 8: Volume Up */}
         <ButtonWithTooltip
           onClick={onVolumeUp}
           ariaLabel="Volume Up"
@@ -237,22 +262,24 @@ export function ControlButtonArray({
         </ButtonWithTooltip>
       </div>
       
-      {/* Tall thin playlist toggle button */}
-      <ButtonWithTooltip
-        onClick={onTogglePlaylist}
-        ariaLabel={isPlaylistVisible ? 'Hide Playlist' : 'Show Playlist'}
-        tooltip={isPlaylistVisible ? 'Hide Playlist' : 'Show Playlist'}
-        customStyle={{
-          height: `${playlistToggleButtonHeight}px`,
-          width: '24px',
-        }}
-      >
-        {isPlaylistVisible ? (
-          <ChevronRight size={14} color={getIconColor()} />
-        ) : (
-          <ChevronLeft size={14} color={getIconColor()} />
-        )}
-      </ButtonWithTooltip>
+      {/* Tall thin playlist toggle button - hidden on mobile */}
+      {!isMobile && (
+        <ButtonWithTooltip
+          onClick={onTogglePlaylist}
+          ariaLabel={isPlaylistVisible ? 'Hide Playlist' : 'Show Playlist'}
+          tooltip={isPlaylistVisible ? 'Hide Playlist' : 'Show Playlist'}
+          customStyle={{
+            height: `${playlistToggleButtonHeight}px`,
+            width: '24px',
+          }}
+        >
+          {isPlaylistVisible ? (
+            <ChevronRight size={14} color={getIconColor()} />
+          ) : (
+            <ChevronLeft size={14} color={getIconColor()} />
+          )}
+        </ButtonWithTooltip>
+      )}
     </div>
   );
 }
