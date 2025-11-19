@@ -13,6 +13,7 @@ export interface BotConfig {
 }
 
 let lastUpdateId = 0;
+const processedUpdateIds = new Set<number>();
 
 /**
  * Check if webhook is set
@@ -154,12 +155,21 @@ export async function startBot(config: BotConfig): Promise<void> {
   console.log('💡 Send /start to your bot to begin testing');
   console.log('');
 
-  // Test bot token
+  // Test bot token and register commands
   try {
     const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
     const data = await response.json();
     if (data.ok) {
       console.log(`✅ Bot connected: @${data.result.username}`);
+      
+      // Register bot commands for autocomplete
+      const { setMyCommands } = await import('../utils/telegram-bot');
+      try {
+        await setMyCommands(botToken);
+        console.log('✅ Bot commands registered (type / to see autocomplete)');
+      } catch (error) {
+        console.warn('⚠️  Failed to register bot commands (non-critical):', error);
+      }
     } else {
       console.error('❌ Invalid bot token');
       process.exit(1);
@@ -236,9 +246,28 @@ export async function startBot(config: BotConfig): Promise<void> {
         });
       }
       
+      // Filter out already processed updates to prevent duplicates
+      const newUpdates = updates.filter(update => !processedUpdateIds.has(update.update_id));
+      
+      // Update lastUpdateId BEFORE processing to prevent duplicate processing
+      // This ensures that if the same update comes in multiple polling cycles, it won't be processed again
+      if (updates.length > 0) {
+        lastUpdateId = Math.max(...updates.map(u => u.update_id));
+      }
+      
+      // Mark updates as processed immediately to prevent race conditions
+      newUpdates.forEach(update => processedUpdateIds.add(update.update_id));
+      
+      // Clean up old processed IDs (keep only last 1000 to prevent memory leak)
+      if (processedUpdateIds.size > 1000) {
+        const idsToKeep = Array.from(processedUpdateIds).slice(-500);
+        processedUpdateIds.clear();
+        idsToKeep.forEach(id => processedUpdateIds.add(id));
+      }
+      
       // Process updates in parallel for better responsiveness
       // Each update is independent (different chatId), so no race conditions
-      const updatePromises = updates.map(async (update) => {
+      const updatePromises = newUpdates.map(async (update) => {
         if (update.callback_query) {
           // Process callbacks in parallel - don't block on slow operations
           handleCallbackQuery(callbackConfig, update.callback_query).catch((error) => {
@@ -251,11 +280,6 @@ export async function startBot(config: BotConfig): Promise<void> {
           });
         }
       });
-      
-      // Update lastUpdateId to the highest update_id (updates are ordered)
-      if (updates.length > 0) {
-        lastUpdateId = Math.max(...updates.map(u => u.update_id));
-      }
       
       // Don't wait for all updates - let them process in background
       // This allows the next polling cycle to start immediately

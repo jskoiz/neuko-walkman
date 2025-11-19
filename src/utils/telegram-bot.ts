@@ -272,6 +272,37 @@ export function createInlineKeyboard(buttons: Array<Array<{ text: string; callba
 }
 
 /**
+ * Set bot commands for command autocomplete
+ */
+export async function setMyCommands(botToken: string): Promise<void> {
+  const url = `${TELEGRAM_API_URL}${botToken}/setMyCommands`;
+
+  const commands = [
+    { command: 'start', description: 'Show main menu' },
+    { command: 'playlists', description: 'View all playlists' },
+    { command: 'add', description: 'Add a song to community playlist' },
+    { command: 'help', description: 'Show help and instructions' },
+    { command: 'about', description: 'Learn about Pirate Radio' },
+  ];
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      commands,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.warn(`Failed to set bot commands: ${error}`);
+    // Don't throw - this is not critical
+  }
+}
+
+/**
  * Validate YouTube URL
  */
 export function isValidYouTubeUrl(url: string): boolean {
@@ -345,6 +376,14 @@ interface PlaylistCacheEntry {
 const playlistCache: Map<string, PlaylistCacheEntry> = new Map();
 const PLAYLIST_CACHE_TTL = 30 * 1000; // 30 seconds cache
 
+/**
+ * Clear playlist cache (useful for debugging or forcing refresh)
+ */
+export function clearPlaylistCache(): void {
+  playlistCache.clear();
+  console.log('[bot] Playlist cache cleared');
+}
+
 export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
   // Try to get baseUrl from various sources
   let baseUrl: string | undefined;
@@ -370,40 +409,111 @@ export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
     baseUrl = siteUrl || DEFAULT_SITE_URL;
   }
 
-  // Check cache first
+  // Check cache first (but don't use empty cache)
   const cacheKey = baseUrl;
   const cached = playlistCache.get(cacheKey);
   const now = Date.now();
-  
-  if (cached && (now - cached.timestamp) < PLAYLIST_CACHE_TTL) {
+
+  if (cached && (now - cached.timestamp) < PLAYLIST_CACHE_TTL && cached.data.length > 0) {
+    console.log(`[bot] Using cached playlists (${cached.data.length} playlists)`);
     return cached.data;
   }
 
+  // If cache has empty array, clear it to force fresh fetch
+  if (cached && cached.data.length === 0) {
+    console.log('[bot] Clearing empty cache to force fresh fetch');
+    playlistCache.delete(cacheKey);
+  }
+
   const url = `${baseUrl}/api/playlists.json`;
+  console.log(`[bot] Fetching playlists from: ${url}`);
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    });
+
     if (!response.ok) {
-      throw new Error(`Failed to fetch playlists: ${response.status}`);
+      throw new Error(`Failed to fetch playlists: ${response.status} ${response.statusText}`);
     }
+
     const data = await response.json();
     const playlists = data.playlists || [];
-    
-    // Cache the result
+
+    console.log(`[bot] API response status: ${response.status}, playlists count: ${playlists.length}`);
+    if (data.error) {
+      console.warn(`[bot] API returned error: ${data.error}`);
+    }
+    console.log(`[bot] Successfully fetched ${playlists.length} playlists from API`);
+
+    // If API returns empty, try file fallback before caching
+    if (playlists.length === 0) {
+      console.warn('[bot] API returned empty playlists, trying file fallback...');
+      try {
+        // Check if we're in Node.js context and can read files
+        if (typeof process !== 'undefined' && process.env) {
+          const fs = await import('fs/promises');
+          const path = await import('path');
+
+          // Try to find the playlists.json file
+          let playlistsPath: string;
+          let filePlaylists: any[] = [];
+
+          try {
+            // Try src/config first
+            playlistsPath = path.join(process.cwd(), 'src', 'config', 'playlists.json');
+            const fileData = await fs.readFile(playlistsPath, 'utf-8');
+            const parsed = JSON.parse(fileData);
+            filePlaylists = parsed.playlists || [];
+            console.log(`[bot] Loaded ${filePlaylists.length} playlists from ${playlistsPath}`);
+          } catch (err1) {
+            try {
+              // Try public directory as fallback
+              playlistsPath = path.join(process.cwd(), 'public', 'playlists.json');
+              const fileData = await fs.readFile(playlistsPath, 'utf-8');
+              const parsed = JSON.parse(fileData);
+              filePlaylists = parsed.playlists || [];
+              console.log(`[bot] Loaded ${filePlaylists.length} playlists from ${playlistsPath}`);
+            } catch (err2) {
+              console.warn('[bot] File fallback also failed:', err1, err2);
+            }
+          }
+
+          // Use file playlists if we found any
+          if (filePlaylists.length > 0) {
+            playlistCache.set(cacheKey, {
+              data: filePlaylists,
+              timestamp: now,
+            });
+            return filePlaylists;
+          }
+        }
+      } catch (fileError: any) {
+        console.warn('[bot] File fallback error:', fileError.message || fileError);
+      }
+    }
+
+    // Cache the result (even if empty, but we'll clear it next time)
     playlistCache.set(cacheKey, {
       data: playlists,
       timestamp: now,
     });
-    
+
     return playlists;
-  } catch (error) {
-    // If API fetch fails, try cache (even if expired) as fallback
-    if (cached) {
-      console.warn('API fetch failed, using stale cache');
+  } catch (error: any) {
+    console.warn(`[bot] API fetch failed (${url}):`, error.message || error);
+
+    // If API fetch fails, try cache (even if expired) as fallback, but only if it has data
+    if (cached && cached.data.length > 0) {
+      console.log(`[bot] Using stale cache with ${cached.data.length} playlists`);
       return cached.data;
     }
-    
-    // If API fetch fails, silently try reading from local file (expected in local dev)
+
+    if (cached && cached.data.length === 0) {
+      console.warn('[bot] Stale cache exists but is empty, will try file fallback');
+    }
+
+    // If API fetch fails, try reading from local file (expected in local dev)
     try {
       // Check if we're in Node.js context and can read files
       if (typeof process !== 'undefined' && process.env) {
@@ -412,45 +522,49 @@ export async function fetchPlaylists(siteUrl?: string): Promise<any[]> {
 
         // Try to find the playlists.json file
         let playlistsPath: string;
+        let playlists: any[] = [];
+
         try {
-          // If running from scripts directory
+          // Try src/config first
           playlistsPath = path.join(process.cwd(), 'src', 'config', 'playlists.json');
           const data = await fs.readFile(playlistsPath, 'utf-8');
           const parsed = JSON.parse(data);
-          const playlists = parsed.playlists || [];
-          
-          // Cache local file result too
-          playlistCache.set(cacheKey, {
-            data: playlists,
-            timestamp: now,
-          });
-          
-          return playlists;
-        } catch {
-          // Try public directory as fallback
-          playlistsPath = path.join(process.cwd(), 'public', 'playlists.json');
-          const data = await fs.readFile(playlistsPath, 'utf-8');
-          const parsed = JSON.parse(data);
-          const playlists = parsed.playlists || [];
-          
-          // Cache local file result too
-          playlistCache.set(cacheKey, {
-            data: playlists,
-            timestamp: now,
-          });
-          
-          return playlists;
+          playlists = parsed.playlists || [];
+          console.log(`[bot] Loaded ${playlists.length} playlists from ${playlistsPath}`);
+        } catch (err1) {
+          try {
+            // Try public directory as fallback
+            playlistsPath = path.join(process.cwd(), 'public', 'playlists.json');
+            const data = await fs.readFile(playlistsPath, 'utf-8');
+            const parsed = JSON.parse(data);
+            playlists = parsed.playlists || [];
+            console.log(`[bot] Loaded ${playlists.length} playlists from ${playlistsPath}`);
+          } catch (err2) {
+            console.error(`[bot] Failed to read playlists from both locations:`, err1, err2);
+            throw err2;
+          }
         }
+
+        // Cache local file result too
+        if (playlists.length > 0) {
+          playlistCache.set(cacheKey, {
+            data: playlists,
+            timestamp: now,
+          });
+        }
+
+        return playlists;
       }
-    } catch (fileError) {
-      // Only log if local file read also failed (actual error)
-      console.error('Error reading local playlists file:', fileError);
+    } catch (fileError: any) {
+      console.error('[bot] Error reading local playlists file:', fileError.message || fileError);
     }
 
     // Only log as error if we're in a context where local file fallback isn't available
     if (typeof process === 'undefined' || !process.env) {
-      console.error('Error fetching playlists (no local file fallback available):', error);
+      console.error('[bot] Error fetching playlists (no local file fallback available):', error);
     }
+
+    console.error('[bot] Returning empty playlists array - all fetch methods failed');
     return [];
   }
 }

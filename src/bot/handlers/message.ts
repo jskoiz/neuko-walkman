@@ -2,13 +2,15 @@
  * Message handler
  */
 
-import { sendMessage, isValidSongUrl, isAdmin } from '../../utils/telegram-bot';
+import { sendMessage, isValidSongUrl, isAdmin, createInlineKeyboard } from '../../utils/telegram-bot';
 import { checkRateLimit, getResetTime } from '../../utils/rate-limiter';
 import { RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW, ERROR_MESSAGES } from '../../constants';
 import { sessionManager } from '../session/session';
 import { processSongSubmission } from '../services/song-processor';
 import { handleStartCommand } from '../commands/start';
 import { showPlaylists } from '../services/playlist-service';
+import { handleHelpCommand } from '../commands/help';
+import { handleAboutCommand } from '../commands/about';
 import { logBotActivity } from '../utils/logger';
 
 export interface MessageHandlerConfig {
@@ -28,7 +30,8 @@ export async function handleMessage(
   if (!text) return;
 
   // Check if this is a command (should not be rate limited)
-  const isCommand = text.startsWith('/start') || text.startsWith('/playlists');
+  const isCommand = text.startsWith('/start') || text.startsWith('/playlists') ||
+    text.startsWith('/help') || text.startsWith('/about') || text.startsWith('/add');
 
   // Only check rate limit for non-command messages
   if (!isCommand) {
@@ -52,6 +55,83 @@ export async function handleMessage(
     }
   }
 
+  // Handle commands first - they should cancel any active session
+  if (text.startsWith('/start')) {
+    // Cancel any active session when using /start
+    sessionManager.delete(chatId);
+    await handleStartCommand({
+      botToken,
+      chatId,
+      username,
+      userId,
+    });
+    return;
+  }
+
+  if (text.startsWith('/playlists')) {
+    // Cancel any active session when using /playlists
+    sessionManager.delete(chatId);
+    const isAdminUser = userId ? isAdmin(userId) : false;
+
+    logBotActivity({
+      timestamp: new Date().toISOString(),
+      userId,
+      username,
+      chatId,
+      action: 'COMMAND_PLAYLISTS',
+      details: { isAdmin: isAdminUser },
+      status: 'info',
+    });
+
+    await showPlaylists({
+      botToken,
+      chatId,
+      userId,
+      username,
+      isAdminUser,
+    }, undefined, false);
+    return;
+  }
+
+  if (text.startsWith('/help')) {
+    // Cancel any active session when using /help
+    sessionManager.delete(chatId);
+    await handleHelpCommand({
+      botToken,
+      chatId,
+      userId,
+      username,
+    });
+    return;
+  }
+
+  if (text.startsWith('/about')) {
+    // Cancel any active session when using /about
+    sessionManager.delete(chatId);
+    await handleAboutCommand({
+      botToken,
+      chatId,
+      userId,
+      username,
+    });
+    return;
+  }
+
+  if (text.startsWith('/add')) {
+    // Cancel any active session when using /add
+    sessionManager.delete(chatId);
+    sessionManager.set(chatId, { type: 'waiting_for_url' });
+
+    // Add cancel button
+    const cancelButtons = createInlineKeyboard([
+      [{ text: '❌ Cancel', callback_data: 'cancel_add_song' }]
+    ]);
+
+    await sendMessage(botToken, chatId, '📎 Please share a YouTube or Spotify link to the song you want to add to the community playlist.', cancelButtons);
+    return;
+  }
+
+  // Handle session-based flows (waiting for URL)
   const session = sessionManager.get(chatId);
   if (session && session.type === 'waiting_for_url') {
     if (isValidSongUrl(text)) {
@@ -91,39 +171,6 @@ export async function handleMessage(
     return;
   }
 
-  if (text.startsWith('/start')) {
-    await handleStartCommand({
-      botToken,
-      chatId,
-      username,
-      userId,
-    });
-    return;
-  }
-
-  if (text.startsWith('/playlists')) {
-    const isAdminUser = userId ? isAdmin(userId) : false;
-
-    logBotActivity({
-      timestamp: new Date().toISOString(),
-      userId,
-      username,
-      chatId,
-      action: 'COMMAND_PLAYLISTS',
-      details: { isAdmin: isAdminUser },
-      status: 'info',
-    });
-
-    await showPlaylists({
-      botToken,
-      chatId,
-      userId,
-      username,
-      isAdminUser,
-    }, undefined, false);
-    return;
-  }
-
   logBotActivity({
     timestamp: new Date().toISOString(),
     userId,
@@ -136,4 +183,5 @@ export async function handleMessage(
 
   await sendMessage(botToken, chatId, '👋 Use /start to see available options!');
 }
+
 

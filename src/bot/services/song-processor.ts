@@ -138,29 +138,21 @@ export async function processSongSubmission(
       status: 'success',
     });
   } catch (error: any) {
-    const { ERROR_MESSAGES } = await import('../../constants');
-    let errorMessage = error.message || 'An unknown error occurred';
-
-    // Handle network/fetch errors
-    if (errorMessage.includes('fetch failed') || errorMessage.includes('ECONNRESET') || errorMessage.includes('ETIMEDOUT') || errorMessage.includes('ENOTFOUND')) {
-      errorMessage = ERROR_MESSAGES.NETWORK_ERROR;
-    } else if (errorMessage.includes('File too large')) {
-      errorMessage = ERROR_MESSAGES.FILE_TOO_LARGE;
-    } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
-      errorMessage = ERROR_MESSAGES.DOWNLOAD_TIMEOUT;
-    } else if (errorMessage.includes('No MP3 file found') || errorMessage.includes('Download failed')) {
-      errorMessage = ERROR_MESSAGES.DOWNLOAD_FAILED;
-    } else if (errorMessage.includes('FTP') || errorMessage.includes('SFTP')) {
-      errorMessage = ERROR_MESSAGES.FTP_ERROR;
-    } else if (errorMessage.includes('command not found') || errorMessage.includes('ENOENT')) {
-      errorMessage = ERROR_MESSAGES.SERVICE_UNAVAILABLE;
-    }
-
+    const { ErrorHandler } = await import('../../services/error-handler');
     const { sendMessage } = await import('../../utils/telegram-bot');
+
+    const userMessage = ErrorHandler.handle(error, {
+      userId,
+      username,
+      chatId,
+      action: 'SONG_SUBMISSION_FAILED',
+      details: { url, playlist: targetPlaylist },
+    });
+
     await sendMessage(
       botToken,
       chatId,
-      `❌ Error: ${errorMessage}\n\nPlease make sure you're sharing a valid YouTube or Spotify link.`
+      `❌ Error: ${userMessage}\n\nPlease make sure you're sharing a valid YouTube or Spotify link.`
     );
 
     logBotActivity({
@@ -169,7 +161,7 @@ export async function processSongSubmission(
       username,
       chatId,
       action: 'SONG_SUBMISSION_FAILED',
-      details: { url, playlist: targetPlaylist, errorMessage },
+      details: { url, playlist: targetPlaylist, errorMessage: error.message },
       status: 'error',
       error: error.stack || error.message,
     });
@@ -190,4 +182,5 @@ export async function processSongSubmission(
     }
   }
 }
+
 

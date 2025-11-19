@@ -16,9 +16,9 @@ dotenv.config();
  */
 async function main() {
   // Validate required environment variables
-  validateAndThrow(['TELEGRAM_BOT_TOKEN'], 'Telegram Bot');
+  validateAndThrow('Telegram Bot');
   
-const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
   
   if (!botToken) {
     console.error('❌ TELEGRAM_BOT_TOKEN not set in environment variables');

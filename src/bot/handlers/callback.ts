@@ -88,7 +88,34 @@ export async function handleCallbackQuery(
       }
     }
     sessionManager.set(chatId, { type: 'waiting_for_url' });
-    await sendMessage(botToken, chatId, '📎 Please share a YouTube or Spotify link to the song you want to add to the community playlist.');
+    
+    // Add cancel button
+    const { createInlineKeyboard } = await import('../../utils/telegram-bot');
+    const cancelButtons = createInlineKeyboard([
+      [{ text: '❌ Cancel', callback_data: 'cancel_add_song' }]
+    ]);
+    
+    await sendMessage(botToken, chatId, '📎 Please share a YouTube or Spotify link to the song you want to add to the community playlist.', cancelButtons);
+    return;
+  }
+
+  if (data === 'cancel_add_song') {
+    // Delete the "waiting for URL" message if it exists
+    if (messageId) {
+      try {
+        await deleteMessage(botToken, chatId, messageId);
+      } catch (error) {
+        // Ignore errors - message might already be deleted
+      }
+    }
+    
+    sessionManager.delete(chatId);
+    await handleStartCommand({
+      botToken,
+      chatId,
+      username,
+      userId,
+    });
     return;
   }
 
@@ -211,7 +238,14 @@ export async function handleCallbackQuery(
         }
       }
       sessionManager.set(chatId, { type: 'waiting_for_url', playlistName });
-      await sendMessage(botToken, chatId, `📎 Please share a YouTube or Spotify link to add to the "${playlistName}" playlist.`);
+      
+      // Add cancel button
+      const { createInlineKeyboard } = await import('../../utils/telegram-bot');
+      const cancelButtons = createInlineKeyboard([
+        [{ text: '❌ Cancel', callback_data: 'cancel_add_song' }]
+      ]);
+      
+      await sendMessage(botToken, chatId, `📎 Please share a YouTube or Spotify link to add to the "${playlistName}" playlist.`, cancelButtons);
       return;
     }
 

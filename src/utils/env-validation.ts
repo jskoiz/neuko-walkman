@@ -4,10 +4,8 @@
  * Supports both Node.js (process.env) and Astro/Vite (import.meta.env) contexts
  */
 
-interface EnvContext {
-  get: (key: string) => string | undefined;
-  has: (key: string) => boolean;
-}
+import { z } from 'zod';
+import { ValidationError } from '../types/errors';
 
 /**
  * Get environment variable from either process.env or import.meta.env
@@ -17,7 +15,7 @@ function getEnvValue(key: string): string | undefined {
   if (typeof process !== 'undefined' && process.env && process.env[key]) {
     return process.env[key];
   }
-  
+
   // Try import.meta.env (Astro/Vite context)
   try {
     if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
@@ -26,16 +24,40 @@ function getEnvValue(key: string): string | undefined {
   } catch {
     // import.meta not available, that's okay
   }
-  
+
   return undefined;
 }
 
 /**
- * Check if environment variable exists
+ * Environment Schema Definition
  */
-function hasEnvValue(key: string): boolean {
-  return getEnvValue(key) !== undefined;
-}
+const envSchema = z.object({
+  // Bot Configuration
+  TELEGRAM_BOT_TOKEN: z.string().min(1, "Bot token is required"),
+  TELEGRAM_ADMIN_IDS: z.string().optional(),
+
+  // FTP Configuration
+  DREAMHOST_FTP_USER: z.string().min(1, "FTP user is required"),
+  DREAMHOST_FTP_PASSWORD: z.string().min(1, "FTP password is required"),
+  DREAMHOST_FTP_HOST: z.string().default('ftp.dreamhost.com'),
+  DREAMHOST_FTP_PATH: z.string().optional(),
+  DREAMHOST_USE_SFTP: z.enum(['true', 'false']).optional().default('false'),
+
+  // App Configuration
+  PUBLIC_SITE_URL: z.string().url().optional(),
+  MAX_FILE_SIZE: z.string().regex(/^\d+$/, "Must be a number").optional(),
+  AUDIO_QUALITY: z.string().optional(),
+
+  // Spotify Configuration (Optional)
+  SPOTIPY_CLIENT_ID: z.string().optional(),
+  SPOTIPY_CLIENT_SECRET: z.string().optional(),
+
+  // Other
+  PLAYLIST_UPDATE_TOKEN: z.string().optional(),
+  PLAYLIST_CACHE_TTL: z.string().regex(/^\d+$/, "Must be a number").optional(),
+});
+
+export type EnvConfig = z.infer<typeof envSchema>;
 
 /**
  * Validation result
@@ -44,132 +66,106 @@ export interface ValidationResult {
   valid: boolean;
   missing: string[];
   errors: string[];
+  config?: EnvConfig;
 }
 
 /**
- * Required environment variables for bot
+ * Collect all environment variables into an object for validation
  */
-export const BOT_REQUIRED_ENV_VARS = [
-  'TELEGRAM_BOT_TOKEN',
-] as const;
+function collectEnvVars(): Record<string, any> {
+  const vars: Record<string, any> = {};
+  // We only collect keys defined in the schema to avoid polluting with system env vars
+  const schemaKeys = Object.keys(envSchema.shape);
 
-/**
- * Required environment variables for FTP operations
- */
-export const FTP_REQUIRED_ENV_VARS = [
-  'DREAMHOST_FTP_USER',
-  'DREAMHOST_FTP_PASSWORD',
-] as const;
+  for (const key of schemaKeys) {
+    const value = getEnvValue(key);
+    if (value !== undefined) {
+      vars[key] = value;
+    }
+  }
 
-/**
- * Optional environment variables with defaults
- */
-export interface OptionalEnvVars {
-  DREAMHOST_FTP_HOST?: string;
-  DREAMHOST_FTP_PATH?: string;
-  DREAMHOST_USE_SFTP?: string;
-  PUBLIC_SITE_URL?: string;
-  SPOTIPY_CLIENT_ID?: string;
-  SPOTIPY_CLIENT_SECRET?: string;
-  MAX_FILE_SIZE?: string;
-  AUDIO_QUALITY?: string;
-  TELEGRAM_ADMIN_IDS?: string;
-  PLAYLIST_UPDATE_TOKEN?: string;
-  PLAYLIST_CACHE_TTL?: string;
+  return vars;
 }
 
 /**
- * Validate required environment variables
+ * Validate all environment variables
  */
-export function validateEnvVars(requiredVars: readonly string[]): ValidationResult {
+export function validateEnv(): ValidationResult {
+  const envVars = collectEnvVars();
+  const result = envSchema.safeParse(envVars);
+
+  if (result.success) {
+    return {
+      valid: true,
+      missing: [],
+      errors: [],
+      config: result.data,
+    };
+  }
+
   const missing: string[] = [];
   const errors: string[] = [];
 
-  for (const varName of requiredVars) {
-    if (!hasEnvValue(varName)) {
-      missing.push(varName);
+  for (const issue of result.error.issues) {
+    const path = issue.path.join('.');
+    if (issue.code === 'invalid_type' && issue.received === 'undefined') {
+      missing.push(path);
+    } else {
+      errors.push(`${path}: ${issue.message}`);
     }
   }
 
   return {
-    valid: missing.length === 0,
+    valid: false,
     missing,
     errors,
   };
 }
 
 /**
- * Validate bot environment variables
- */
-export function validateBotEnv(): ValidationResult {
-  return validateEnvVars(BOT_REQUIRED_ENV_VARS);
-}
-
-/**
- * Validate FTP environment variables
- */
-export function validateFTPEnv(): ValidationResult {
-  return validateEnvVars(FTP_REQUIRED_ENV_VARS);
-}
-
-/**
- * Validate all environment variables (bot + FTP)
- */
-export function validateAllEnv(): ValidationResult {
-  const botResult = validateBotEnv();
-  const ftpResult = validateFTPEnv();
-  
-  const missing = [...botResult.missing, ...ftpResult.missing];
-  
-  return {
-    valid: missing.length === 0,
-    missing,
-    errors: [...botResult.errors, ...ftpResult.errors],
-  };
-}
-
-/**
- * Get environment variable value with optional default
- */
-export function getEnv(key: string, defaultValue?: string): string {
-  const value = getEnvValue(key);
-  if (value !== undefined) {
-    return value;
-  }
-  if (defaultValue !== undefined) {
-    return defaultValue;
-  }
-  throw new Error(`Environment variable ${key} is not set and no default value provided`);
-}
-
-/**
- * Get environment variable value or undefined
- */
-export function getEnvOptional(key: string): string | undefined {
-  return getEnvValue(key);
-}
-
-/**
- * Format validation error message
- */
-export function formatValidationError(result: ValidationResult): string {
-  if (result.valid) {
-    return '';
-  }
-  
-  const missingList = result.missing.map(v => `  - ${v}`).join('\n');
-  return `Missing required environment variables:\n${missingList}\n\nPlease set these in your .env file or environment.`;
-}
-
-/**
  * Validate and throw if invalid (for startup)
  */
-export function validateAndThrow(requiredVars: readonly string[], context: string = 'application'): void {
-  const result = validateEnvVars(requiredVars);
+export function validateAndThrow(context: string = 'application'): EnvConfig {
+  const result = validateEnv();
+
   if (!result.valid) {
-    const errorMessage = formatValidationError(result);
-    console.error(`\n❌ ${context} startup failed:\n${errorMessage}`);
-    process.exit(1);
+    let errorMessage = `❌ ${context} startup failed:\n`;
+
+    if (result.missing.length > 0) {
+      errorMessage += `Missing required environment variables:\n${result.missing.map(v => `  - ${v}`).join('\n')}\n`;
+    }
+
+    if (result.errors.length > 0) {
+      errorMessage += `Validation errors:\n${result.errors.map(e => `  - ${e}`).join('\n')}\n`;
+    }
+
+    console.error(errorMessage);
+
+    // Only exit if we are in a Node.js environment (not browser/client-side)
+    if (typeof process !== 'undefined' && process.exit) {
+      process.exit(1);
+    }
+
+    throw new ValidationError(errorMessage);
   }
+
+  return result.config!;
 }
 
+/**
+ * Get a validated environment variable
+ * Throws if validation hasn't run or if variable is invalid
+ */
+export function getEnv(key: keyof EnvConfig): string {
+  const value = getEnvValue(key);
+  if (value === undefined) {
+    // This should ideally be caught by validateAndThrow at startup
+    throw new Error(`Environment variable ${key} is not set`);
+  }
+  return value;
+}
+
+// Re-export for backward compatibility if needed, but prefer validateEnv
+export const validateBotEnv = validateEnv;
+export const validateFTPEnv = validateEnv;
+export const validateAllEnv = validateEnv;
